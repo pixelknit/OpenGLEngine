@@ -58,7 +58,7 @@ int main() {
 
     Shader shader("shaders/pbr.vs", "shaders/pbr.fs");
     
-    Model ourModel("models/cup/cube.obj");
+    Model ourModel("models/cup/cup.obj");
 
     glm::vec3 lightPositions[] = {
         glm::vec3(10.0f,  10.0f, 10.0f),
