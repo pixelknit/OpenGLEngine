@@ -29,6 +29,37 @@ bool firstMouse = true;
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
 
+// Shadow map dimensions
+const unsigned int shadow_dim {1024}; 
+const unsigned int SHADOW_WIDTH = shadow_dim, SHADOW_HEIGHT = shadow_dim;
+unsigned int depthMapFBO;
+unsigned int depthMap;
+
+// Helper function to render scene, hard coded to 3 objects for testing
+void renderScene(Shader &shader, Model &model1, Model &model2, Model &model3) {
+    // Object 1
+    glm::mat4 model = glm::mat4(1.0f);
+    model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
+    model = glm::scale(model, glm::vec3(0.5f));
+    shader.setMat4("model", model);
+    model1.Draw(shader);
+    
+    // Object 2
+    model = glm::mat4(1.0f);
+    model = glm::translate(model, glm::vec3(3.0f, -1.0f, 1.0f));
+    model = glm::scale(model, glm::vec3(0.4f));
+    model = glm::rotate(model, glm::radians(45.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+    shader.setMat4("model", model);
+    model2.Draw(shader);
+    
+    // Object 3 
+    model = glm::mat4(1.0f);
+    model = glm::translate(model, glm::vec3(-3.0f, 1.5f, -1.0f));
+    model = glm::scale(model, glm::vec3(0.6f));
+    shader.setMat4("model", model);
+    model3.Draw(shader);
+}
+
 int main() {
     glfwInit();
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
@@ -56,172 +87,123 @@ int main() {
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
 
-    glm::vec3 lightPositions[] = {
-        glm::vec3(10.0f,  10.0f, 10.0f),
-        glm::vec3(10.0f, -10.0f, 10.0f),
-        glm::vec3(-10.0f, 10.0f, 10.0f)
-    };
-    glm::vec3 lightColors[] = {
-        glm::vec3(300.0f, 300.0f, 300.0f),
-        glm::vec3(300.0f, 300.0f, 300.0f),
-        glm::vec3(300.0f, 300.0f, 300.0f)
-    };
-    int nrRows = 7;
-    int nrColumns = 7;
-    float spacing = 2.5;
-    
-    //load model and shaders
-    Shader shader("shaders/pbr.vs", "shaders/pbr.fs");
-    
-    Model ourModel("models/plane/simple_plane.obj");
+    // Build and compile shaders
+    Shader pbrShader("shaders/pbr.vs", "shaders/pbr.fs");
+    Shader simpleDepthShader("shaders/shadow_depth.vs", "shaders/shadow_depth.fs");
 
+    // Load multiple models (can be same file or different)
+    Model model1("models/cup/cup.obj");
+    Model model2("models/plane/simple_plane.obj");  
+    Model model3("models/table/sphere.obj"); 
+
+    // Load textures
     unsigned int albedo    = loadTexture("models/plane/albedo.png");
     unsigned int normal    = loadTexture("models/plane/normal.png");
     unsigned int metallic  = loadTexture("models/plane/metallic.png");
     unsigned int roughness = loadTexture("models/plane/roughness.png");
     unsigned int ao        = loadTexture("models/plane/ao.png");
 
-    shader.use();
-    shader.setInt("albedoMap", 0);
-    shader.setInt("normalMap", 1);
-    shader.setInt("metallicMap", 2);
-    shader.setInt("roughnessMap", 3);
-    shader.setInt("aoMap", 4);
+    // Configure depth map FBO
+    glGenFramebuffers(1, &depthMapFBO);
+    glGenTextures(1, &depthMap);
+    glBindTexture(GL_TEXTURE_2D, depthMap);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, SHADOW_WIDTH, SHADOW_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+    float borderColor[] = { 1.0f, 1.0f, 1.0f, 1.0f };
+    glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
 
-    //cup
-    Shader shader2("shaders/pbr.vs", "shaders/pbr.fs");
-    
-    Model cupModel("models/cup/cup.obj");
+    glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthMap, 0);
+    glDrawBuffer(GL_NONE);
+    glReadBuffer(GL_NONE);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-    unsigned int cup_albedo    = loadTexture("models/cup/albedo.png");
-    unsigned int cup_normal    = loadTexture("models/cup/normal.png");
-    unsigned int cup_metallic  = loadTexture("models/cup/metallic.png");
-    unsigned int cup_roughness = loadTexture("models/cup/roughness.png");
-    unsigned int cup_ao        = loadTexture("models/cup/albedo.png");
+    // Light setup (use first light as "sun" for shadows)
+    glm::vec3 lightPos(-2.0f, 4.0f, -1.0f);
+    glm::vec3 lightColors[] = {
+        glm::vec3(300.0f, 300.0f, 300.0f),
+        glm::vec3(100.0f, 100.0f, 100.0f),
+        glm::vec3(100.0f, 100.0f, 100.0f)
+    };
+    glm::vec3 lightPositions[] = {
+        lightPos,
+        glm::vec3(10.0f, -10.0f, 10.0f),
+        glm::vec3(-10.0f, 10.0f, 10.0f)
+    };
 
-    shader2.use();
-    shader2.setInt("albedoMap", 0);
-    shader2.setInt("normalMap", 1);
-    shader2.setInt("metallicMap", 2);
-    shader2.setInt("roughnessMap", 3);
-    shader2.setInt("aoMap", 4);
-
-    //table
-    Shader shader3("shaders/pbr.vs", "shaders/pbr.fs");
-    
-    Model tableModel("models/table/sphere.obj");
-
-    unsigned int table_albedo    = loadTexture("models/table/albedo.png");
-    unsigned int table_normal    = loadTexture("models/table/normal.png");
-    unsigned int table_metallic  = loadTexture("models/table/metallic.png");
-    unsigned int table_roughness = loadTexture("models/table/roughness.png");
-    unsigned int table_ao        = loadTexture("models/table/albedo.png");
-
-    shader3.use();
-    shader3.setInt("albedoMap", 0);
-    shader3.setInt("normalMap", 1);
-    shader3.setInt("metallicMap", 2);
-    shader3.setInt("roughnessMap", 3);
-    shader3.setInt("aoMap", 4);
+    // Configure PBR shader
+    pbrShader.use();
+    pbrShader.setInt("albedoMap", 0);
+    pbrShader.setInt("normalMap", 1);
+    pbrShader.setInt("metallicMap", 2);
+    pbrShader.setInt("roughnessMap", 3);
+    pbrShader.setInt("aoMap", 4);
+    pbrShader.setInt("shadowMap", 5);  // Shadow map in here :)
 
     while (!glfwWindowShouldClose(window)) {
-        float currentFrame = glfwGetTime();
-        deltaTime = currentFrame - lastFrame;
-        lastFrame = currentFrame;
+    float currentFrame = glfwGetTime();
+    deltaTime = currentFrame - lastFrame;
+    lastFrame = currentFrame;
 
-        processInput(window);
+    processInput(window);
 
-        glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    //Shadow setup
+    // Render depth of scene to texture (from light's perspective)
+    glm::mat4 lightProjection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, 1.0f, 7.5f);
+    glm::mat4 lightView = glm::lookAt(lightPos, glm::vec3(0.0f), glm::vec3(0.0, 1.0, 0.0));
+    glm::mat4 lightSpaceMatrix = lightProjection * lightView;
+    
+    simpleDepthShader.use();
+    simpleDepthShader.setMat4("lightSpaceMatrix", lightSpaceMatrix);
+    
+    glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
+    glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
+    glClear(GL_DEPTH_BUFFER_BIT);
+    glCullFace(GL_FRONT);  // Prevent peter-panning
+    renderScene(simpleDepthShader, model1, model2, model3); //hard coded 3 models, to fix this <-
+    glCullFace(GL_BACK);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-        shader.use();
-        shader2.use();
-        shader3.use();
-        
-        glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
-        glm::mat4 view = camera.GetViewMatrix();
-        shader.setMat4("projection", projection);
-        shader.setMat4("view", view);
-        shader.setVec3("camPos", camera.Position);
-
-        //shader1
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, albedo);
-        glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, normal);
-        glActiveTexture(GL_TEXTURE2);
-        glBindTexture(GL_TEXTURE_2D, metallic);
-        glActiveTexture(GL_TEXTURE3);
-        glBindTexture(GL_TEXTURE_2D, roughness);
-        glActiveTexture(GL_TEXTURE4);
-        glBindTexture(GL_TEXTURE_2D, ao);
-
-        glm::mat4 model = glm::mat4(1.0f);
-        model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
-        model = glm::scale(model, glm::vec3(0.5f));
-        model = glm::rotate(model, glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-        shader.setMat4("model", model);
-        
-        for (unsigned int i = 0; i < sizeof(lightPositions) / sizeof(lightPositions[0]); ++i) {
-            shader.setVec3("lightPositions[" + std::to_string(i) + "]", lightPositions[i]);
-            shader.setVec3("lightColors[" + std::to_string(i) + "]", lightColors[i]);
-        }
-
-        ourModel.Draw(shader);
-
-        //shader2
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, cup_albedo);
-        glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, cup_normal);
-        glActiveTexture(GL_TEXTURE2);
-        glBindTexture(GL_TEXTURE_2D, cup_metallic);
-        glActiveTexture(GL_TEXTURE3);
-        glBindTexture(GL_TEXTURE_2D, cup_roughness);
-        glActiveTexture(GL_TEXTURE4);
-        glBindTexture(GL_TEXTURE_2D, cup_ao);
-
-        glm::mat4 model2 = glm::mat4(1.0f);
-        model2 = glm::translate(model2, glm::vec3(5.0f, 1.0f, 0.0f));
-        model2 = glm::scale(model2, glm::vec3(0.5f));
-        model2 = glm::rotate(model2, glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-        shader2.setMat4("model", model2);
-        
-        // for (unsigned int i = 0; i < sizeof(lightPositions) / sizeof(lightPositions[0]); ++i) {
-        //     shader2.setVec3("lightPositions[" + std::to_string(i) + "]", lightPositions[i]);
-        //     shader2.setVec3("lightColors[" + std::to_string(i) + "]", lightColors[i]);
-        // }
-
-        cupModel.Draw(shader2);
-
-        //shader3
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, table_albedo);
-        glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, table_normal);
-        glActiveTexture(GL_TEXTURE2);
-        glBindTexture(GL_TEXTURE_2D, table_metallic);
-        glActiveTexture(GL_TEXTURE3);
-        glBindTexture(GL_TEXTURE_2D, table_roughness);
-        glActiveTexture(GL_TEXTURE4);
-        glBindTexture(GL_TEXTURE_2D, table_ao);
-
-        glm::mat4 model3 = glm::mat4(1.0f);
-        model3 = glm::translate(model3, glm::vec3(0.0f, 0.3f, 3.0f));
-        model3 = glm::scale(model3, glm::vec3(1.0f));
-        model3 = glm::rotate(model3, glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-        shader3.setMat4("model", model3);
-        
-        // for (unsigned int i = 0; i < sizeof(lightPositions) / sizeof(lightPositions[0]); ++i) {
-        //     shader3.setVec3("lightPositions[" + std::to_string(i) + "]", lightPositions[i]);
-        //     shader3.setVec3("lightColors[" + std::to_string(i) + "]", lightColors[i]);
-        // }
-
-        tableModel.Draw(shader2);
-
-        glfwSwapBuffers(window);
-        glfwPollEvents();
+    // Render scene as normal with shadow mapping
+    glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    
+    pbrShader.use();
+    glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+    glm::mat4 view = camera.GetViewMatrix();
+    pbrShader.setMat4("projection", projection);
+    pbrShader.setMat4("view", view);
+    pbrShader.setVec3("camPos", camera.Position);
+    pbrShader.setMat4("lightSpaceMatrix", lightSpaceMatrix);
+    
+    // Set lights
+    for (unsigned int i = 0; i < 3; ++i) {
+        pbrShader.setVec3("lightPositions[" + std::to_string(i) + "]", lightPositions[i]);
+        pbrShader.setVec3("lightColors[" + std::to_string(i) + "]", lightColors[i]);
     }
+
+    // Bind textures
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, albedo);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, normal);
+    glActiveTexture(GL_TEXTURE2);
+    glBindTexture(GL_TEXTURE_2D, metallic);
+    glActiveTexture(GL_TEXTURE3);
+    glBindTexture(GL_TEXTURE_2D, roughness);
+    glActiveTexture(GL_TEXTURE4);
+    glBindTexture(GL_TEXTURE_2D, ao);
+    glActiveTexture(GL_TEXTURE5);  // Shadow map
+    glBindTexture(GL_TEXTURE_2D, depthMap);
+
+    renderScene(pbrShader, model1, model2, model3);
+
+    glfwSwapBuffers(window);
+    glfwPollEvents();
+}
 
     glfwTerminate();
     return 0;
