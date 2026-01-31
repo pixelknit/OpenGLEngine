@@ -1,4 +1,3 @@
-
 #include "model.h"
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
@@ -7,7 +6,10 @@
 #include <glm/gtc/type_ptr.hpp>
 #include "shader.h"
 #include "camera.h"
+#include "test_callback.h"
+#include "scene_manager.h"
 #include <iostream>
+#include <vector>
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
@@ -35,32 +37,12 @@ const unsigned int SHADOW_WIDTH = shadow_dim, SHADOW_HEIGHT = shadow_dim;
 unsigned int depthMapFBO;
 unsigned int depthMap;
 
-// Helper function to render scene, hard coded to 3 objects for testing
-void renderScene(Shader &shader, Model &model1, Model &model2, Model &model3) {
-    // Object 1
-    glm::mat4 model = glm::mat4(1.0f);
-    model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
-    model = glm::scale(model, glm::vec3(0.5f));
-    shader.setMat4("model", model);
-    model1.Draw(shader);
-    
-    // Object 2
-    model = glm::mat4(1.0f);
-    model = glm::translate(model, glm::vec3(3.0f, -1.0f, 1.0f));
-    model = glm::scale(model, glm::vec3(0.4f));
-    model = glm::rotate(model, glm::radians(45.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-    shader.setMat4("model", model);
-    model2.Draw(shader);
-    
-    // Object 3 
-    model = glm::mat4(1.0f);
-    model = glm::translate(model, glm::vec3(-3.0f, 1.5f, -1.0f));
-    model = glm::scale(model, glm::vec3(0.6f));
-    shader.setMat4("model", model);
-    model3.Draw(shader);
-}
+// Helper function to render scene 
+SceneUtils sceneRender = SceneUtils();
 
 int main() {
+    TestCallback test1 = TestCallback();
+    test1.PrintTest();
     glfwInit();
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
@@ -92,9 +74,11 @@ int main() {
     Shader simpleDepthShader("shaders/shadow_depth.vs", "shaders/shadow_depth.fs");
 
     // Load multiple models (can be same file or different)
-    Model model1("models/cup/cup.obj");
-    Model model2("models/plane/simple_plane.obj");  
+    Model model1("models/plane/simple_plane.obj");  
+    Model model2("models/cup/cup.obj");
     Model model3("models/table/sphere.obj"); 
+
+    vector<Model> models {model1, model2, model3};
 
     // Load textures
     unsigned int albedo    = loadTexture("models/plane/albedo.png");
@@ -163,7 +147,8 @@ int main() {
     glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
     glClear(GL_DEPTH_BUFFER_BIT);
     glCullFace(GL_FRONT);  // Prevent peter-panning
-    renderScene(simpleDepthShader, model1, model2, model3); //hard coded 3 models, to fix this <-
+    // renderScene(simpleDepthShader, model1, model2, model3); //hard coded 3 models, to fix this <-
+    sceneRender.renderScene(simpleDepthShader, models); //hard coded 3 models, to fix this <-
     glCullFace(GL_BACK);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
@@ -199,7 +184,8 @@ int main() {
     glActiveTexture(GL_TEXTURE5);  // Shadow map
     glBindTexture(GL_TEXTURE_2D, depthMap);
 
-    renderScene(pbrShader, model1, model2, model3);
+    // renderScene(pbrShader, model1, model2, model3);
+    sceneRender.renderScene(pbrShader, models);
 
     glfwSwapBuffers(window);
     glfwPollEvents();
