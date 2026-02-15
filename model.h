@@ -23,13 +23,15 @@ using namespace std;
 unsigned int TextureFromFile(const char *path, const string &directory, bool gamma = false);
 
 class Model {
+private:
+    string m_Name;
 public:
     vector<Texture> textures_loaded;
     vector<Mesh>    meshes;
     string directory;
     bool gammaCorrection;
 
-    Model(string const &path, bool gamma = false) : gammaCorrection(gamma) {
+    Model(string const &name, string const &path, bool gamma = false) : m_Name(name), gammaCorrection(gamma) {
         loadModel(path);
     }
 

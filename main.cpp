@@ -23,7 +23,7 @@ unsigned int loadTexture(const char *path);
 const unsigned int SCR_WIDTH = 1280;
 const unsigned int SCR_HEIGHT = 720;
 
-Camera camera(glm::vec3(0.0f, 0.0f, 10.0f));
+Camera camera(glm::vec3(0.0f, 2.0f, 10.0f));
 float lastX = SCR_WIDTH / 2.0f;
 float lastY = SCR_HEIGHT / 2.0f;
 bool firstMouse = true;
@@ -48,7 +48,7 @@ int main() {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "PBR OBJ Viewer", NULL, NULL);
+    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "RETINAL ENGINE", NULL, NULL);
     if (window == NULL) {
         std::cout << "Failed to create GLFW window" << std::endl;
         glfwTerminate();
@@ -74,11 +74,11 @@ int main() {
     Shader simpleDepthShader("shaders/shadow_depth.vs", "shaders/shadow_depth.fs");
 
     // Load multiple models (can be same file or different)
-    Model model1("models/plane/simple_plane.obj");  
-    Model model2("models/cup/cup.obj");
-    Model model3("models/table/sphere.obj"); 
+    Model model1("ground","models/plane/simple_plane.obj");  
+    Model model2("cup", "models/cup/cup.obj");
+    Model model3("table", "models/table/table.obj"); 
 
-    vector<Model> models {model1, model2, model3};
+    vector<Model*> models {&model1, &model2, &model3};
 
     // Load textures
     unsigned int albedo    = loadTexture("models/plane/albedo.png");
