@@ -56,6 +56,16 @@ class SceneUtils{
 
   }
 
+  void renderModel(Shader &shader, Model* Model, glm::vec3 position, glm::vec3 scale)
+  {
+        glm::mat4 model = glm::mat4(1.0f);
+        model = glm::translate(model, position);
+        model = glm::scale(model, scale);
+        shader.setMat4("model", model);
+        Model->Draw(shader);
+
+  }
+
 };
 
 #endif
