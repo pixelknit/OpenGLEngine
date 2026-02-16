@@ -9,7 +9,7 @@
 #include "test_callback.h"
 #include "scene_manager.h"
 #include <iostream>
-#include <vector>
+//#include <vector>
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
@@ -24,18 +24,18 @@ const unsigned int SCR_WIDTH = 1280;
 const unsigned int SCR_HEIGHT = 720;
 
 Camera camera(glm::vec3(0.0f, 2.0f, 10.0f));
-float lastX = SCR_WIDTH / 2.0f;
-float lastY = SCR_HEIGHT / 2.0f;
-bool firstMouse = true;
+float  lastX = SCR_WIDTH / 2.0f;
+float  lastY = SCR_HEIGHT / 2.0f;
+bool   firstMouse = true;
 
-float deltaTime = 0.0f;
-float lastFrame = 0.0f;
+float  deltaTime = 0.0f;
+float  lastFrame = 0.0f;
 
 // Shadow map dimensions
 const unsigned int shadow_dim {1024}; 
 const unsigned int SHADOW_WIDTH = shadow_dim, SHADOW_HEIGHT = shadow_dim;
-unsigned int depthMapFBO;
-unsigned int depthMap;
+unsigned int       depthMapFBO;
+unsigned int       depthMap;
 
 // Helper function to render scene 
 SceneUtils sceneRender = SceneUtils();
@@ -88,14 +88,15 @@ int main() {
     unsigned int ao        = loadTexture("models/plane/ao.png");
 
     // Configure depth map FBO
-    glGenFramebuffers(1, &depthMapFBO);
-    glGenTextures(1, &depthMap);
-    glBindTexture(GL_TEXTURE_2D, depthMap);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, SHADOW_WIDTH, SHADOW_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+    glGenFramebuffers (1, &depthMapFBO);
+    glGenTextures     (1, &depthMap);
+    glBindTexture     (GL_TEXTURE_2D, depthMap);
+    glTexImage2D      (GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, SHADOW_WIDTH, SHADOW_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+    glTexParameteri   (GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri   (GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri   (GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+    glTexParameteri   (GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+
     float borderColor[] = { 1.0f, 1.0f, 1.0f, 1.0f };
     glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
 
