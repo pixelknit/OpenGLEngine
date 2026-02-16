@@ -69,8 +69,6 @@ int main() {
 
     // Build and compile shaders
     Shader pbrShader("shaders/pbr.vs", "shaders/pbr.fs");
-    Shader pbrShader_cup("shaders/pbr.vs", "shaders/pbr.fs");
-    Shader pbrShader_table("shaders/pbr.vs", "shaders/pbr.fs");
     Shader simpleDepthShader("shaders/shadow_depth.vs", "shaders/shadow_depth.fs");
 
     // Load multiple models (can be same file or different)
@@ -140,22 +138,6 @@ int main() {
     pbrShader.setInt("aoMap", 4);
     pbrShader.setInt("shadowMap", 5);  // Shadow map in here :)
 
-    pbrShader_cup.use();
-    pbrShader_cup.setInt("albedoMap", 0);
-    pbrShader_cup.setInt("normalMap", 1);
-    pbrShader_cup.setInt("metallicMap", 2);
-    pbrShader_cup.setInt("roughnessMap", 3);
-    pbrShader_cup.setInt("aoMap", 4);
-    pbrShader_cup.setInt("shadowMap", 5);  // Shadow map in here :)
-
-    pbrShader_table.use();
-    pbrShader_table.setInt("albedoMap", 0);
-    pbrShader_table.setInt("normalMap", 1);
-    pbrShader_table.setInt("metallicMap", 2);
-    pbrShader_table.setInt("roughnessMap", 3);
-    pbrShader_table.setInt("aoMap", 4);
-    pbrShader_table.setInt("shadowMap", 5);  // Shadow map in here :)
-
     while (!glfwWindowShouldClose(window)) {
     float currentFrame = glfwGetTime();
     deltaTime = currentFrame - lastFrame;
@@ -205,8 +187,8 @@ int main() {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     
     pbrShader.use();
-    pbrShader_cup.use();
-    pbrShader_table.use();
+    // pbrShader_cup.use();
+    // pbrShader_table.use();
 
     glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
     glm::mat4 view = camera.GetViewMatrix();
@@ -251,7 +233,7 @@ int main() {
     glActiveTexture(GL_TEXTURE5);  // Shadow map
     glBindTexture(GL_TEXTURE_2D, depthMap);
 
-    sceneRender.renderModel(pbrShader_cup, &model2, model2_position, model2_scale);
+    sceneRender.renderModel(pbrShader, &model2, model2_position, model2_scale);
 
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, table_albedo);
@@ -266,10 +248,8 @@ int main() {
     glActiveTexture(GL_TEXTURE5);  // Shadow map
     glBindTexture(GL_TEXTURE_2D, depthMap);
 
-    sceneRender.renderModel(pbrShader_table, &model3, model3_position, model3_scale);
-    // renderScene(pbrShader, model1, model2, model3);
+    sceneRender.renderModel(pbrShader, &model3, model3_position, model3_scale);
     //sceneRender.renderScene(pbrShader, models);
-    
     // sceneRender.renderModel(pbrShader, &model1, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.5f));
 
     glfwSwapBuffers(window);
