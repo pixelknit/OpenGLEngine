@@ -6,6 +6,7 @@
 #include <glm/gtc/type_ptr.hpp>
 #include "shader.h"
 #include "camera.h"
+#include "test_callback.h"
 #include "scene_manager.h"
 #include <iostream>
 #include <vector>
@@ -22,7 +23,7 @@ unsigned int loadTexture(const char *path);
 const unsigned int SCR_WIDTH = 1280;
 const unsigned int SCR_HEIGHT = 720;
 
-Camera camera(glm::vec3(0.0f, 0.0f, 10.0f));
+Camera camera(glm::vec3(0.0f, 2.0f, 10.0f));
 float lastX = SCR_WIDTH / 2.0f;
 float lastY = SCR_HEIGHT / 2.0f;
 bool firstMouse = true;
@@ -40,12 +41,14 @@ unsigned int depthMap;
 SceneUtils sceneRender = SceneUtils();
 
 int main() {
+    TestCallback test1 = TestCallback();
+    test1.PrintTest();
     glfwInit();
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "PBR OBJ Viewer", NULL, NULL);
+    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "RETINAL ENGINE", NULL, NULL);
     if (window == NULL) {
         std::cout << "Failed to create GLFW window" << std::endl;
         glfwTerminate();
@@ -71,11 +74,11 @@ int main() {
     Shader simpleDepthShader("shaders/shadow_depth.vs", "shaders/shadow_depth.fs");
 
     // Load multiple models (can be same file or different)
-    Model model1("models/plane/simple_plane.obj");  
-    Model model2("models/cup/cup.obj");
-    Model model3("models/table/sphere.obj"); 
+    Model model1("ground","models/plane/simple_plane.obj");  
+    Model model2("cup", "models/cup/cup.obj");
+    Model model3("table", "models/table/table.obj"); 
 
-    vector<Model> models {model1, model2, model3};
+    //vector<Model*> models {&model1, &model2, &model3};
 
     // Load textures
     unsigned int albedo    = loadTexture("models/plane/albedo.png");
@@ -145,7 +148,26 @@ int main() {
     glClear(GL_DEPTH_BUFFER_BIT);
     glCullFace(GL_FRONT);  // Prevent peter-panning
     // renderScene(simpleDepthShader, model1, model2, model3); //hard coded 3 models, to fix this <-
-    sceneRender.renderScene(simpleDepthShader, models); //hard coded 3 models, to fix this <-
+    //sceneRender.renderScene(simpleDepthShader, models); //hard coded 3 models, to fix this <-
+    
+    //---------------------------3D OBJECTS XFORMS------------------------------------------------
+    //ground 
+    const glm::vec3 model1_position {0.0f, 0.0f, 0.0f};
+    const glm::vec3 model1_scale {0.2f};
+    //cup
+    const glm::vec3 model2_position {1.0f, 2.05f, 0.0f};
+    const glm::vec3 model2_scale {0.5f};
+    //table
+    const glm::vec3 model3_position {1.0f, 1.0f, 0.0f};
+    const glm::vec3 model3_scale {0.02f};
+
+    //---------------------------RENDER SHADOW DEPTH PIPELINE--------------------------------------
+    
+    sceneRender.renderModel(simpleDepthShader, &model1, model1_position, model1_scale);
+    sceneRender.renderModel(simpleDepthShader, &model2, model2_position, model2_scale);
+    sceneRender.renderModel(simpleDepthShader, &model3, model3_position, model3_scale);
+
+
     glCullFace(GL_BACK);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
@@ -182,7 +204,13 @@ int main() {
     glBindTexture(GL_TEXTURE_2D, depthMap);
 
     // renderScene(pbrShader, model1, model2, model3);
-    sceneRender.renderScene(pbrShader, models);
+    //sceneRender.renderScene(pbrShader, models);
+    
+    //---------------------------RENDER SHADER GEOM PIPELINE--------------------------------------
+    // sceneRender.renderModel(pbrShader, &model1, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.5f));
+    sceneRender.renderModel(pbrShader, &model1, model1_position, model1_scale);
+    sceneRender.renderModel(pbrShader, &model2, model2_position, model2_scale);
+    sceneRender.renderModel(pbrShader, &model3, model3_position, model3_scale);
 
     glfwSwapBuffers(window);
     glfwPollEvents();
@@ -262,4 +290,3 @@ unsigned int loadTexture(const char *path) {
 
     return textureID;
 }
-

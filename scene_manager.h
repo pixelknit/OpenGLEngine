@@ -16,7 +16,7 @@ class SceneUtils{
 
   }
 
-  //test method for shader draw process
+  //hard coded first test render scene method
   void renderScene_test(Shader &shader, Model &model1, Model &model2, Model &model3) {
       // Object 1
       glm::mat4 model = glm::mat4(1.0f);
@@ -42,21 +42,30 @@ class SceneUtils{
   }
 
 
-  void renderScene(Shader &shader, vector<Model> &models)
+  void renderScene(Shader &shader, vector<Model*> &models)
   {
       int i {0};
-      for (Model &model_it: models ){
+      for (Model* model_it: models ){
         glm::mat4 model = glm::mat4(1.0f);
         model = glm::translate(model, glm::vec3(0.0f + i, 0.0f + i, 0.0f));
         model = glm::scale(model, glm::vec3(0.5f));
         shader.setMat4("model", model);
-        model_it.Draw(shader);
+        model_it->Draw(shader);
         ++i;
       }
+
+  }
+
+  void renderModel(Shader &shader, Model* Model, glm::vec3 position, glm::vec3 scale)
+  {
+        glm::mat4 model = glm::mat4(1.0f);
+        model = glm::translate(model, position);
+        model = glm::scale(model, scale);
+        shader.setMat4("model", model);
+        Model->Draw(shader);
 
   }
 
 };
 
 #endif
-
