@@ -9,7 +9,7 @@
 #include "test_callback.h"
 #include "scene_manager.h"
 #include <iostream>
-#include <vector>
+//#include <vector>
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
@@ -24,18 +24,18 @@ const unsigned int SCR_WIDTH = 1280;
 const unsigned int SCR_HEIGHT = 720;
 
 Camera camera(glm::vec3(0.0f, 2.0f, 10.0f));
-float lastX = SCR_WIDTH / 2.0f;
-float lastY = SCR_HEIGHT / 2.0f;
-bool firstMouse = true;
+float  lastX = SCR_WIDTH / 2.0f;
+float  lastY = SCR_HEIGHT / 2.0f;
+bool   firstMouse = true;
 
-float deltaTime = 0.0f;
-float lastFrame = 0.0f;
+float  deltaTime = 0.0f;
+float  lastFrame = 0.0f;
 
 // Shadow map dimensions
 const unsigned int shadow_dim {1024}; 
 const unsigned int SHADOW_WIDTH = shadow_dim, SHADOW_HEIGHT = shadow_dim;
-unsigned int depthMapFBO;
-unsigned int depthMap;
+unsigned int       depthMapFBO;
+unsigned int       depthMap;
 
 // Helper function to render scene 
 SceneUtils sceneRender = SceneUtils();
@@ -81,21 +81,34 @@ int main() {
     //vector<Model*> models {&model1, &model2, &model3};
 
     // Load textures
-    unsigned int albedo    = loadTexture("models/plane/albedo.png");
-    unsigned int normal    = loadTexture("models/plane/normal.png");
-    unsigned int metallic  = loadTexture("models/plane/metallic.png");
-    unsigned int roughness = loadTexture("models/plane/roughness.png");
-    unsigned int ao        = loadTexture("models/plane/ao.png");
+    unsigned int albedo          = loadTexture("models/plane/albedo.png");
+    unsigned int normal          = loadTexture("models/plane/normal.png");
+    unsigned int metallic        = loadTexture("models/plane/metallic.png");
+    unsigned int roughness       = loadTexture("models/plane/roughness.png");
+    unsigned int ao              = loadTexture("models/plane/ao.png");
+
+    unsigned int cup_albedo      = loadTexture("models/cup/albedo.png");
+    unsigned int cup_normal      = loadTexture("models/cup/normal.png");
+    unsigned int cup_metallic    = loadTexture("models/cup/metallic.png");
+    unsigned int cup_roughness   = loadTexture("models/cup/roughness.png");
+    unsigned int cup_ao          = loadTexture("models/cup/ao.png");
+
+    unsigned int table_albedo    = loadTexture("models/table/albedo.png");
+    unsigned int table_normal    = loadTexture("models/table/normal.png");
+    unsigned int table_metallic  = loadTexture("models/table/metallic.png");
+    unsigned int table_roughness = loadTexture("models/table/roughness.png");
+    unsigned int table_ao        = loadTexture("models/table/ao.png");
 
     // Configure depth map FBO
-    glGenFramebuffers(1, &depthMapFBO);
-    glGenTextures(1, &depthMap);
-    glBindTexture(GL_TEXTURE_2D, depthMap);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, SHADOW_WIDTH, SHADOW_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+    glGenFramebuffers (1, &depthMapFBO);
+    glGenTextures     (1, &depthMap);
+    glBindTexture     (GL_TEXTURE_2D, depthMap);
+    glTexImage2D      (GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, SHADOW_WIDTH, SHADOW_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+    glTexParameteri   (GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri   (GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri   (GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+    glTexParameteri   (GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+
     float borderColor[] = { 1.0f, 1.0f, 1.0f, 1.0f };
     glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
 
@@ -176,6 +189,9 @@ int main() {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     
     pbrShader.use();
+    // pbrShader_cup.use();
+    // pbrShader_table.use();
+
     glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
     glm::mat4 view = camera.GetViewMatrix();
     pbrShader.setMat4("projection", projection);
@@ -189,6 +205,7 @@ int main() {
         pbrShader.setVec3("lightColors[" + std::to_string(i) + "]", lightColors[i]);
     }
 
+    //---------------------------RENDER SHADER GEOM PIPELINE--------------------------------------
     // Bind textures
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, albedo);
@@ -203,14 +220,39 @@ int main() {
     glActiveTexture(GL_TEXTURE5);  // Shadow map
     glBindTexture(GL_TEXTURE_2D, depthMap);
 
-    // renderScene(pbrShader, model1, model2, model3);
-    //sceneRender.renderScene(pbrShader, models);
-    
-    //---------------------------RENDER SHADER GEOM PIPELINE--------------------------------------
-    // sceneRender.renderModel(pbrShader, &model1, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.5f));
     sceneRender.renderModel(pbrShader, &model1, model1_position, model1_scale);
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, cup_albedo);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, cup_normal);
+    glActiveTexture(GL_TEXTURE2);
+    glBindTexture(GL_TEXTURE_2D, cup_metallic);
+    glActiveTexture(GL_TEXTURE3);
+    glBindTexture(GL_TEXTURE_2D, cup_roughness);
+    glActiveTexture(GL_TEXTURE4);
+    glBindTexture(GL_TEXTURE_2D, cup_ao);
+    glActiveTexture(GL_TEXTURE5);  // Shadow map
+    glBindTexture(GL_TEXTURE_2D, depthMap);
+
     sceneRender.renderModel(pbrShader, &model2, model2_position, model2_scale);
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, table_albedo);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, table_normal);
+    glActiveTexture(GL_TEXTURE2);
+    glBindTexture(GL_TEXTURE_2D, table_metallic);
+    glActiveTexture(GL_TEXTURE3);
+    glBindTexture(GL_TEXTURE_2D, table_roughness);
+    glActiveTexture(GL_TEXTURE4);
+    glBindTexture(GL_TEXTURE_2D, table_ao);
+    glActiveTexture(GL_TEXTURE5);  // Shadow map
+    glBindTexture(GL_TEXTURE_2D, depthMap);
+
     sceneRender.renderModel(pbrShader, &model3, model3_position, model3_scale);
+    //sceneRender.renderScene(pbrShader, models);
+    // sceneRender.renderModel(pbrShader, &model1, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.5f));
 
     glfwSwapBuffers(window);
     glfwPollEvents();
