@@ -80,6 +80,7 @@ int main() {
 
     //vector<Model*> models {&model1, &model2, &model3};
 
+    //TODO fix boiler plate
     // Load textures
     unsigned int albedo          = loadTexture("models/plane/albedo.png");
     unsigned int normal          = loadTexture("models/plane/normal.png");
@@ -176,9 +177,9 @@ int main() {
 
     //---------------------------RENDER SHADOW DEPTH PIPELINE--------------------------------------
     
-    sceneRender.renderModel(simpleDepthShader, &model1, model1_position, model1_scale);
     sceneRender.renderModel(simpleDepthShader, &model2, model2_position, model2_scale);
     sceneRender.renderModel(simpleDepthShader, &model3, model3_position, model3_scale);
+    sceneRender.renderModel(simpleDepthShader, &model1, model1_position, model1_scale);
 
 
     glCullFace(GL_BACK);
@@ -207,52 +208,15 @@ int main() {
 
     //---------------------------RENDER SHADER GEOM PIPELINE--------------------------------------
     // Bind textures
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, albedo);
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, normal);
-    glActiveTexture(GL_TEXTURE2);
-    glBindTexture(GL_TEXTURE_2D, metallic);
-    glActiveTexture(GL_TEXTURE3);
-    glBindTexture(GL_TEXTURE_2D, roughness);
-    glActiveTexture(GL_TEXTURE4);
-    glBindTexture(GL_TEXTURE_2D, ao);
-    glActiveTexture(GL_TEXTURE5);  // Shadow map
-    glBindTexture(GL_TEXTURE_2D, depthMap);
 
-    sceneRender.renderModel(pbrShader, &model1, model1_position, model1_scale);
+    sceneRender.processShaderPipeline(cup_albedo, cup_normal, cup_metallic, cup_roughness, cup_ao, depthMap,
+        pbrShader, &model2, model2_position, model2_scale);
 
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, cup_albedo);
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, cup_normal);
-    glActiveTexture(GL_TEXTURE2);
-    glBindTexture(GL_TEXTURE_2D, cup_metallic);
-    glActiveTexture(GL_TEXTURE3);
-    glBindTexture(GL_TEXTURE_2D, cup_roughness);
-    glActiveTexture(GL_TEXTURE4);
-    glBindTexture(GL_TEXTURE_2D, cup_ao);
-    glActiveTexture(GL_TEXTURE5);  // Shadow map
-    glBindTexture(GL_TEXTURE_2D, depthMap);
+    sceneRender.processShaderPipeline(table_albedo, table_normal, table_metallic, table_roughness, table_ao, depthMap,
+        pbrShader, &model3, model3_position, model3_scale);
 
-    sceneRender.renderModel(pbrShader, &model2, model2_position, model2_scale);
-
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, table_albedo);
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, table_normal);
-    glActiveTexture(GL_TEXTURE2);
-    glBindTexture(GL_TEXTURE_2D, table_metallic);
-    glActiveTexture(GL_TEXTURE3);
-    glBindTexture(GL_TEXTURE_2D, table_roughness);
-    glActiveTexture(GL_TEXTURE4);
-    glBindTexture(GL_TEXTURE_2D, table_ao);
-    glActiveTexture(GL_TEXTURE5);  // Shadow map
-    glBindTexture(GL_TEXTURE_2D, depthMap);
-
-    sceneRender.renderModel(pbrShader, &model3, model3_position, model3_scale);
-    //sceneRender.renderScene(pbrShader, models);
-    // sceneRender.renderModel(pbrShader, &model1, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.5f));
+    sceneRender.processShaderPipeline(albedo, normal, metallic, roughness, ao, depthMap, 
+        pbrShader, &model1, model1_position, model1_scale);
 
     glfwSwapBuffers(window);
     glfwPollEvents();

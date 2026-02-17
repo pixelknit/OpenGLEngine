@@ -66,8 +66,34 @@ class SceneUtils{
 
   }
 
-  void processShaderPipeline()
+  void processShaderPipeline(
+      unsigned int &albedo,
+      unsigned int &normal,
+      unsigned int &metallic,
+      unsigned int &roughness,
+      unsigned int &ao,
+      unsigned int &depthMap,
+      Shader &pbrShader,
+      Model* model,
+      glm::vec3 model_position,
+      glm::vec3 model_scale
+      )
   {
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, albedo);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, normal);
+    glActiveTexture(GL_TEXTURE2);
+    glBindTexture(GL_TEXTURE_2D, metallic);
+    glActiveTexture(GL_TEXTURE3);
+    glBindTexture(GL_TEXTURE_2D, roughness);
+    glActiveTexture(GL_TEXTURE4);
+    glBindTexture(GL_TEXTURE_2D, ao);
+    glActiveTexture(GL_TEXTURE5);  // Shadow map
+    glBindTexture(GL_TEXTURE_2D, depthMap);
+
+    renderModel(pbrShader, model, model_position, model_scale);
     
   }
 

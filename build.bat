@@ -1,9 +1,10 @@
-#!/bin/sh
+@echo off
 
-cd build/
+cd build
 
 cmake --build . --config Release
 
 cd ..
 
-./build/pbr_viewer
+build\pbr_viewer.exe
+
