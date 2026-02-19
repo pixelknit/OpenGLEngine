@@ -80,7 +80,7 @@ int main() {
 
     //vector<Model*> models {&model1, &model2, &model3};
 
-    //TODO fix boiler plate
+    
     // Load textures
     unsigned int albedo          = loadTexture("models/plane/albedo.png");
     unsigned int normal          = loadTexture("models/plane/normal.png");
@@ -99,6 +99,7 @@ int main() {
     unsigned int table_metallic  = loadTexture("models/table/metallic.png");
     unsigned int table_roughness = loadTexture("models/table/roughness.png");
     unsigned int table_ao        = loadTexture("models/table/ao.png");
+
 
     // Configure depth map FBO
     glGenFramebuffers (1, &depthMapFBO);
@@ -175,11 +176,12 @@ int main() {
     const glm::vec3 model3_position {1.0f, 1.0f, 0.0f};
     const glm::vec3 model3_scale {0.02f};
 
+
     //---------------------------RENDER SHADOW DEPTH PIPELINE--------------------------------------
     
+    sceneRender.renderModel(simpleDepthShader, &model1, model1_position, model1_scale);
     sceneRender.renderModel(simpleDepthShader, &model2, model2_position, model2_scale);
     sceneRender.renderModel(simpleDepthShader, &model3, model3_position, model3_scale);
-    sceneRender.renderModel(simpleDepthShader, &model1, model1_position, model1_scale);
 
 
     glCullFace(GL_BACK);
@@ -209,14 +211,15 @@ int main() {
     //---------------------------RENDER SHADER GEOM PIPELINE--------------------------------------
     // Bind textures
 
+    sceneRender.processShaderPipeline(albedo, normal, metallic, roughness, ao, depthMap, 
+        pbrShader, &model1, model1_position, model1_scale);
+
     sceneRender.processShaderPipeline(cup_albedo, cup_normal, cup_metallic, cup_roughness, cup_ao, depthMap,
         pbrShader, &model2, model2_position, model2_scale);
 
     sceneRender.processShaderPipeline(table_albedo, table_normal, table_metallic, table_roughness, table_ao, depthMap,
         pbrShader, &model3, model3_position, model3_scale);
 
-    sceneRender.processShaderPipeline(albedo, normal, metallic, roughness, ao, depthMap, 
-        pbrShader, &model1, model1_position, model1_scale);
 
     glfwSwapBuffers(window);
     glfwPollEvents();

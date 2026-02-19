@@ -6,5 +6,5 @@ cmake --build . --config Release
 
 cd ..
 
-build\pbr_viewer.exe
+build\Release\pbr_viewer.exe
 
