@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.10)
 project(PBRObjViewer)
 
 set(CMAKE_CXX_STANDARD 14)
-set(glfw3_DIR "C:/Program Files (x86)/GLFW/lib/cmake/glfw3")
+set(glfw3_DIR "/usr/local/include/GLFW")
 
 find_package(glfw3 REQUIRED)
 find_package(OpenGL REQUIRED)
@@ -26,21 +26,10 @@ target_link_libraries(pbr_viewer
     OpenGL::GL 
     glad
     glm::glm
+    dl
+    pthread
 )
 
-# Windows-specific: link necessary system libraries
-if(WIN32)
-    target_link_libraries(pbr_viewer 
-        kernel32 
-        user32 
-        gdi32 
-        winmm
-        imm32 
-        ole32 
-        oleaut32 
-        version
-    )
-endif()
 
 # Copy shaders to build directory
 #file(COPY shaders DESTINATION ${CMAKE_BINARY_DIR})
