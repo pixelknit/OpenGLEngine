@@ -9,17 +9,17 @@ out vec2 TexCoords;
 out vec3 WorldPos;
 out vec3 Normal;
 out mat3 TBN;
-out vec4 FragPosLightSpace;  // ADD THIS
+out vec4 FragPosLightSpace;
 
 uniform mat4 projection;
 uniform mat4 view;
 uniform mat4 model;
-uniform mat4 lightSpaceMatrix;  // ADD THIS
+uniform mat4 lightSpaceMatrix; 
 
 void main() {
     TexCoords = vec2(aTexCoords.x, 1.0 - aTexCoords.y);
     WorldPos = vec3(model * vec4(aPos, 1.0));
-    FragPosLightSpace = lightSpaceMatrix * vec4(WorldPos, 1.0);  // ADD THIS
+    FragPosLightSpace = lightSpaceMatrix * vec4(WorldPos, 1.0);
     
     mat3 normalMatrix = transpose(inverse(mat3(model)));
     vec3 T = normalize(normalMatrix * aTangent);

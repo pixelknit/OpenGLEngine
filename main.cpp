@@ -174,7 +174,7 @@ int main() {
     //---------------------------3D OBJECTS XFORMS------------------------------------------------
     //ground 
     const glm::vec3 model1_position {0.0f, 0.0f, 0.0f};
-    const glm::vec3 model1_scale {0.2f};
+    const glm::vec3 model1_scale {0.8f};
     //cup
     const glm::vec3 model2_position {1.0f, 2.05f, 0.0f};
     const glm::vec3 model2_scale {0.5f};

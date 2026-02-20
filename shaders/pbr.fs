@@ -5,13 +5,13 @@ in vec2 TexCoords;
 in vec3 WorldPos;
 in vec3 Normal;
 in mat3 TBN;
-in vec4 FragPosLightSpace;  // ADD THIS
+in vec4 FragPosLightSpace;
 
 uniform vec3 camPos;
 uniform vec3 lightPositions[4];
 uniform vec3 lightColors[4];
-uniform sampler2D shadowMap;      // ADD THIS
-uniform bool shadows = true;      // ADD THIS (toggle)
+uniform sampler2D shadowMap;
+uniform bool shadows = true; 
 
 uniform sampler2D albedoMap;
 uniform sampler2D normalMap;
