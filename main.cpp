@@ -77,6 +77,7 @@ int main() {
     Model model1("ground","models/plane/simple_plane.obj");  
     Model model2("cup", "models/cup/cup.obj");
     Model model3("table", "models/table/table.obj"); 
+    Model model4("rock", "models/coast_rock/coast_rock.obj"); 
 
     //vector<Model*> models {&model1, &model2, &model3};
 
@@ -100,6 +101,11 @@ int main() {
     unsigned int table_roughness = loadTexture("models/table/roughness.png");
     unsigned int table_ao        = loadTexture("models/table/ao.png");
 
+    unsigned int rock_albedo    = loadTexture("models/coast_rock/albedo.png");
+    unsigned int rock_normal    = loadTexture("models/coast_rock/normal.png");
+    unsigned int rock_metallic  = loadTexture("models/coast_rock/metallic.png");
+    unsigned int rock_roughness = loadTexture("models/coast_rock/roughness.png");
+    unsigned int rock_ao        = loadTexture("models/coast_rock/ao.png");
 
     // Configure depth map FBO
     glGenFramebuffers (1, &depthMapFBO);
@@ -175,6 +181,9 @@ int main() {
     //table
     const glm::vec3 model3_position {1.0f, 1.0f, 0.0f};
     const glm::vec3 model3_scale {0.02f};
+    //rock
+    const glm::vec3 model4_position {12.0f, 0.0f, 0.0f};
+    const glm::vec3 model4_scale {1.0f};
 
 
     //---------------------------RENDER SHADOW DEPTH PIPELINE--------------------------------------
@@ -182,6 +191,7 @@ int main() {
     sceneRender.renderModel(simpleDepthShader, &model1, model1_position, model1_scale);
     sceneRender.renderModel(simpleDepthShader, &model2, model2_position, model2_scale);
     sceneRender.renderModel(simpleDepthShader, &model3, model3_position, model3_scale);
+    sceneRender.renderModel(simpleDepthShader, &model4, model4_position, model4_scale);
 
 
     glCullFace(GL_BACK);
@@ -220,6 +230,8 @@ int main() {
     sceneRender.processShaderPipeline(table_albedo, table_normal, table_metallic, table_roughness, table_ao, depthMap,
         pbrShader, &model3, model3_position, model3_scale);
 
+    sceneRender.processShaderPipeline(rock_albedo, rock_normal, rock_metallic, rock_roughness, rock_ao, depthMap,
+        pbrShader, &model4, model4_position, model4_scale);
 
     glfwSwapBuffers(window);
     glfwPollEvents();
