@@ -20,10 +20,10 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void processInput(GLFWwindow *window);
 unsigned int loadTexture(const char *path);
 
-const unsigned int SCR_WIDTH = 1280;
-const unsigned int SCR_HEIGHT = 720;
+const unsigned int SCR_WIDTH = 1920;
+const unsigned int SCR_HEIGHT = 1080;
 
-Camera camera(glm::vec3(0.0f, 2.0f, 10.0f));
+Camera camera(glm::vec3(0.0f, 3.0f, 10.0f));
 float  lastX = SCR_WIDTH / 2.0f;
 float  lastY = SCR_HEIGHT / 2.0f;
 bool   firstMouse = true;
@@ -32,7 +32,7 @@ float  deltaTime = 0.0f;
 float  lastFrame = 0.0f;
 
 // Shadow map dimensions
-const unsigned int shadow_dim {1024}; 
+const unsigned int shadow_dim {2048}; 
 const unsigned int SHADOW_WIDTH = shadow_dim, SHADOW_HEIGHT = shadow_dim;
 unsigned int       depthMapFBO;
 unsigned int       depthMap;
@@ -157,7 +157,9 @@ int main() {
 
     //Shadow setup
     // Render depth of scene to texture (from light's perspective)
-    glm::mat4 lightProjection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, 1.0f, 7.5f);
+    // scene bounds
+    float sceneRadius = 50.0f;
+    glm::mat4 lightProjection = glm::ortho(-sceneRadius, sceneRadius, -sceneRadius, sceneRadius, 0.1f, 10.0f);
     glm::mat4 lightView = glm::lookAt(lightPos, glm::vec3(0.0f), glm::vec3(0.0, 1.0, 0.0));
     glm::mat4 lightSpaceMatrix = lightProjection * lightView;
     
@@ -167,7 +169,8 @@ int main() {
     glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
     glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
     glClear(GL_DEPTH_BUFFER_BIT);
-    glCullFace(GL_FRONT);  // Prevent peter-panning
+
+    glCullFace(GL_FRONT);  // Prevent peter-panning, WIP
     // renderScene(simpleDepthShader, model1, model2, model3); //hard coded 3 models, to fix this <-
     //sceneRender.renderScene(simpleDepthShader, models); //hard coded 3 models, to fix this <-
     
