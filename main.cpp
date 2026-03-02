@@ -23,7 +23,7 @@ unsigned int loadTexture(const char *path);
 const unsigned int SCR_WIDTH = 1920;
 const unsigned int SCR_HEIGHT = 1080;
 
-Camera camera(glm::vec3(0.0f, 3.0f, 10.0f));
+Camera camera(glm::vec3(0.0f, 4.0f, 10.0f));
 float  lastX = SCR_WIDTH / 2.0f;
 float  lastY = SCR_HEIGHT / 2.0f;
 bool   firstMouse = true;
@@ -101,11 +101,11 @@ int main() {
     unsigned int table_roughness = loadTexture("models/table/roughness.png");
     unsigned int table_ao        = loadTexture("models/table/ao.png");
 
-    unsigned int rock_albedo    = loadTexture("models/coast_rock/albedo.png");
-    unsigned int rock_normal    = loadTexture("models/coast_rock/normal.png");
-    unsigned int rock_metallic  = loadTexture("models/coast_rock/metallic.png");
-    unsigned int rock_roughness = loadTexture("models/coast_rock/roughness.png");
-    unsigned int rock_ao        = loadTexture("models/coast_rock/ao.png");
+    unsigned int rock_albedo     = loadTexture("models/coast_rock/albedo.png");
+    unsigned int rock_normal     = loadTexture("models/coast_rock/normal.png");
+    unsigned int rock_metallic   = loadTexture("models/coast_rock/metallic.png");
+    unsigned int rock_roughness  = loadTexture("models/coast_rock/roughness.png");
+    unsigned int rock_ao         = loadTexture("models/coast_rock/ao.png");
 
     // Configure depth map FBO
     glGenFramebuffers (1, &depthMapFBO);
@@ -149,95 +149,95 @@ int main() {
     pbrShader.setInt("shadowMap", 5);  // Shadow map in here :)
 
     while (!glfwWindowShouldClose(window)) {
-    float currentFrame = glfwGetTime();
-    deltaTime = currentFrame - lastFrame;
-    lastFrame = currentFrame;
+        float currentFrame = glfwGetTime();
+        deltaTime = currentFrame - lastFrame;
+        lastFrame = currentFrame;
 
-    processInput(window);
+        processInput(window);
 
-    //Shadow setup
-    // Render depth of scene to texture (from light's perspective)
-    // scene bounds
-    float sceneRadius = 50.0f;
-    glm::mat4 lightProjection = glm::ortho(-sceneRadius, sceneRadius, -sceneRadius, sceneRadius, 0.1f, 10.0f);
-    glm::mat4 lightView = glm::lookAt(lightPos, glm::vec3(0.0f), glm::vec3(0.0, 1.0, 0.0));
-    glm::mat4 lightSpaceMatrix = lightProjection * lightView;
-    
-    simpleDepthShader.use();
-    simpleDepthShader.setMat4("lightSpaceMatrix", lightSpaceMatrix);
-    
-    glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
-    glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
-    glClear(GL_DEPTH_BUFFER_BIT);
+        //Shadow setup
+        // Render depth of scene to texture (from light's perspective)
+        // scene bounds
+        float sceneRadius =          10.0f;
+        glm::mat4 lightProjection =  glm::ortho(-sceneRadius, sceneRadius, -sceneRadius, sceneRadius, 0.1f, 10.0f);
+        glm::mat4 lightView =        glm::lookAt(lightPos, glm::vec3(0.0f), glm::vec3(0.0, 1.0, 0.0));
+        glm::mat4 lightSpaceMatrix = lightProjection * lightView;
+        
+        simpleDepthShader.use();
+        simpleDepthShader.setMat4("lightSpaceMatrix", lightSpaceMatrix);
+        
+        glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
+        glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
+        glClear(GL_DEPTH_BUFFER_BIT);
 
-    glCullFace(GL_FRONT);  // Prevent peter-panning, WIP
-    // renderScene(simpleDepthShader, model1, model2, model3); //hard coded 3 models, to fix this <-
-    //sceneRender.renderScene(simpleDepthShader, models); //hard coded 3 models, to fix this <-
-    
-    //---------------------------3D OBJECTS XFORMS------------------------------------------------
-    //ground 
-    const glm::vec3 model1_position {0.0f, 0.0f, 0.0f};
-    const glm::vec3 model1_scale {0.8f};
-    //cup
-    const glm::vec3 model2_position {1.0f, 2.05f, 0.0f};
-    const glm::vec3 model2_scale {0.5f};
-    //table
-    const glm::vec3 model3_position {1.0f, 1.0f, 0.0f};
-    const glm::vec3 model3_scale {0.02f};
-    //rock
-    const glm::vec3 model4_position {12.0f, 0.0f, 0.0f};
-    const glm::vec3 model4_scale {1.0f};
-
-
-    //---------------------------RENDER SHADOW DEPTH PIPELINE--------------------------------------
-    
-    sceneRender.renderModel(simpleDepthShader, &model1, model1_position, model1_scale);
-    sceneRender.renderModel(simpleDepthShader, &model2, model2_position, model2_scale);
-    sceneRender.renderModel(simpleDepthShader, &model3, model3_position, model3_scale);
-    sceneRender.renderModel(simpleDepthShader, &model4, model4_position, model4_scale);
+        glCullFace(GL_FRONT);  // Prevent peter-panning, WIP
+        // renderScene(simpleDepthShader, model1, model2, model3); //hard coded 3 models, to fix this <-
+        //sceneRender.renderScene(simpleDepthShader, models); //hard coded 3 models, to fix this <-
+        
+        //---------------------------3D OBJECTS XFORMS------------------------------------------------
+        //ground 
+        const glm::vec3 model1_position {0.0f, 0.0f, 0.0f};
+        const glm::vec3 model1_scale {0.8f};
+        //cup
+        const glm::vec3 model2_position {1.0f, 2.05f, 0.0f};
+        const glm::vec3 model2_scale {0.5f};
+        //table
+        const glm::vec3 model3_position {1.0f, 1.0f, 0.0f};
+        const glm::vec3 model3_scale {0.02f};
+        //rock
+        const glm::vec3 model4_position {12.0f, 0.0f, 0.0f};
+        const glm::vec3 model4_scale {1.0f};
 
 
-    glCullFace(GL_BACK);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        //---------------------------RENDER SHADOW DEPTH PIPELINE--------------------------------------
+        
+        sceneRender.renderModel(simpleDepthShader, &model1, model1_position, model1_scale);
+        sceneRender.renderModel(simpleDepthShader, &model2, model2_position, model2_scale);
+        sceneRender.renderModel(simpleDepthShader, &model3, model3_position, model3_scale);
+        sceneRender.renderModel(simpleDepthShader, &model4, model4_position, model4_scale);
 
-    // Render scene as normal with shadow mapping
-    glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    
-    pbrShader.use();
-    // pbrShader_cup.use();
-    // pbrShader_table.use();
 
-    glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
-    glm::mat4 view = camera.GetViewMatrix();
-    pbrShader.setMat4("projection", projection);
-    pbrShader.setMat4("view", view);
-    pbrShader.setVec3("camPos", camera.Position);
-    pbrShader.setMat4("lightSpaceMatrix", lightSpaceMatrix);
-    
-    // Set lights
-    for (unsigned int i = 0; i < 3; ++i) {
-        pbrShader.setVec3("lightPositions[" + std::to_string(i) + "]", lightPositions[i]);
-        pbrShader.setVec3("lightColors[" + std::to_string(i) + "]", lightColors[i]);
-    }
+        glCullFace(GL_BACK);
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-    //---------------------------RENDER SHADER GEOM PIPELINE--------------------------------------
-    // Bind textures
+        // Render scene as normal with shadow mapping
+        glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        
+        pbrShader.use();
+        // pbrShader_cup.use();
+        // pbrShader_table.use();
 
-    sceneRender.processShaderPipeline(albedo, normal, metallic, roughness, ao, depthMap, 
-        pbrShader, &model1, model1_position, model1_scale);
+        glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+        glm::mat4 view = camera.GetViewMatrix();
+        pbrShader.setMat4("projection", projection);
+        pbrShader.setMat4("view", view);
+        pbrShader.setVec3("camPos", camera.Position);
+        pbrShader.setMat4("lightSpaceMatrix", lightSpaceMatrix);
+        
+        // Set lights
+        for (unsigned int i = 0; i < 3; ++i) {
+            pbrShader.setVec3("lightPositions[" + std::to_string(i) + "]", lightPositions[i]);
+            pbrShader.setVec3("lightColors[" + std::to_string(i) + "]", lightColors[i]);
+        }
 
-    sceneRender.processShaderPipeline(cup_albedo, cup_normal, cup_metallic, cup_roughness, cup_ao, depthMap,
-        pbrShader, &model2, model2_position, model2_scale);
+        //---------------------------RENDER SHADER GEOM PIPELINE--------------------------------------
+        // Bind textures
 
-    sceneRender.processShaderPipeline(table_albedo, table_normal, table_metallic, table_roughness, table_ao, depthMap,
-        pbrShader, &model3, model3_position, model3_scale);
+        sceneRender.processShaderPipeline(albedo, normal, metallic, roughness, ao, depthMap, 
+            pbrShader, &model1, model1_position, model1_scale);
 
-    sceneRender.processShaderPipeline(rock_albedo, rock_normal, rock_metallic, rock_roughness, rock_ao, depthMap,
-        pbrShader, &model4, model4_position, model4_scale);
+        sceneRender.processShaderPipeline(cup_albedo, cup_normal, cup_metallic, cup_roughness, cup_ao, depthMap,
+            pbrShader, &model2, model2_position, model2_scale);
 
-    glfwSwapBuffers(window);
-    glfwPollEvents();
+        sceneRender.processShaderPipeline(table_albedo, table_normal, table_metallic, table_roughness, table_ao, depthMap,
+            pbrShader, &model3, model3_position, model3_scale);
+
+        sceneRender.processShaderPipeline(rock_albedo, rock_normal, rock_metallic, rock_roughness, rock_ao, depthMap,
+            pbrShader, &model4, model4_position, model4_scale);
+
+        glfwSwapBuffers(window);
+        glfwPollEvents();
 }
 
     glfwTerminate();
