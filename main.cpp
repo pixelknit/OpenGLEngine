@@ -67,7 +67,7 @@ int main() {
     }
 
     glEnable(GL_DEPTH_TEST);
-    glEnable(GL_CULL_FACE);
+    //glEnable(GL_CULL_FACE); //Render single sided, it causes shadow contact issues
 
     // Build and compile shaders
     Shader pbrShader("shaders/pbr.vs", "shaders/pbr.fs");
@@ -78,6 +78,7 @@ int main() {
     Model model2("cup", "models/cup/cup.obj");
     Model model3("table", "models/table/table.obj"); 
     Model model4("rock", "models/coast_rock/coast_rock.obj"); 
+    Model model5("sphere", "models/table/sphere.obj"); 
 
     //vector<Model*> models {&model1, &model2, &model3};
 
@@ -179,7 +180,7 @@ int main() {
         const glm::vec3 model1_position {0.0f, 0.0f, 0.0f};
         const glm::vec3 model1_scale {0.8f};
         //cup
-        const glm::vec3 model2_position {1.0f, 2.05f, 0.0f};
+        const glm::vec3 model2_position {1.0f, 2.06f, 0.0f};
         const glm::vec3 model2_scale {0.5f};
         //table
         const glm::vec3 model3_position {1.0f, 1.0f, 0.0f};
@@ -187,6 +188,9 @@ int main() {
         //rock
         const glm::vec3 model4_position {12.0f, 0.0f, 0.0f};
         const glm::vec3 model4_scale {1.0f};
+        //sphere
+        const glm::vec3 model5_position {1.0f, 4.0f, 0.0f};
+        const glm::vec3 model5_scale {0.5f};
 
 
         //---------------------------RENDER SHADOW DEPTH PIPELINE--------------------------------------
@@ -195,6 +199,7 @@ int main() {
         sceneRender.renderModel(simpleDepthShader, &model2, model2_position, model2_scale);
         sceneRender.renderModel(simpleDepthShader, &model3, model3_position, model3_scale);
         sceneRender.renderModel(simpleDepthShader, &model4, model4_position, model4_scale);
+        sceneRender.renderModel(simpleDepthShader, &model5, model5_position, model5_scale);
 
 
         glCullFace(GL_BACK);
@@ -235,6 +240,9 @@ int main() {
 
         sceneRender.processShaderPipeline(rock_albedo, rock_normal, rock_metallic, rock_roughness, rock_ao, depthMap,
             pbrShader, &model4, model4_position, model4_scale);
+
+        sceneRender.processShaderPipeline(albedo, normal, metallic, roughness, ao, depthMap, 
+            pbrShader, &model5, model5_position, model5_scale);
 
         glfwSwapBuffers(window);
         glfwPollEvents();
