@@ -1,0 +1,26 @@
+# Blender 5.0.1 MTL File: 'None'
+# www.blender.org
+
+newmtl dumpster
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd C:/Users/felip/development/games/Assets/dumpsters/uploads_files_5434852_dumpsters_(OBJ)/Textures/dumpster_BaseColor.png
+map_Ns C:/Users/felip/development/games/Assets/dumpsters/uploads_files_5434852_dumpsters_(OBJ)/Textures/dumpster_Roughness.png
+map_refl C:/Users/felip/development/games/Assets/dumpsters/uploads_files_5434852_dumpsters_(OBJ)/Textures/dumpster_Metallic.png
+map_Bump -bm 1.000000 C:/Users/felip/development/games/Assets/dumpsters/uploads_files_5434852_dumpsters_(OBJ)/Textures/dumpster_Normal_GL.png
+
+newmtl graffiti
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+illum 2
+map_Kd C:/Users/felip/development/games/Assets/dumpsters/uploads_files_5434852_dumpsters_(OBJ)/Textures/graffiti_BaseColor.png
+map_Ns C:/Users/felip/development/games/Assets/dumpsters/uploads_files_5434852_dumpsters_(OBJ)/Textures/graffiti_Roughness.png
+map_refl C:/Users/felip/development/games/Assets/dumpsters/uploads_files_5434852_dumpsters_(OBJ)/Textures/graffiti_Metallic.png
+map_d C:/Users/felip/development/games/Assets/dumpsters/uploads_files_5434852_dumpsters_(OBJ)/Textures/graffiti_Opacity.png
+map_Bump -bm 1.000000 C:/Users/felip/development/games/Assets/dumpsters/uploads_files_5434852_dumpsters_(OBJ)/Textures/graffiti_Normal_GL.png

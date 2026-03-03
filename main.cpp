@@ -80,6 +80,7 @@ int main() {
     Model model4("rock", "models/coast_rock/coast_rock.obj"); 
     Model model5("sphere", "models/table/sphere.obj"); 
     Model model6("trash", "models/trash_bags/trash_bags.obj"); 
+    Model model7("dumpsters", "models/dumpsters/dumpsters.obj"); 
 
     //vector<Model*> models {&model1, &model2, &model3};
 
@@ -114,6 +115,12 @@ int main() {
     unsigned int trash_metallic   = loadTexture("models/trash_bags/metallic.png");
     unsigned int trash_roughness  = loadTexture("models/trash_bags/roughness.png");
     unsigned int trash_ao         = loadTexture("models/trash_bags/ao.png");
+
+    unsigned int dumpsters_albedo     = loadTexture("models/dumpsters/albedo.png");
+    unsigned int dumpsters_normal     = loadTexture("models/dumpsters/normal.png");
+    unsigned int dumpsters_metallic   = loadTexture("models/dumpsters/metallic.png");
+    unsigned int dumpsters_roughness  = loadTexture("models/dumpsters/roughness.png");
+    unsigned int dumpsters_ao         = loadTexture("models/dumpsters/ao.png");
 
     // Configure depth map FBO
     glGenFramebuffers (1, &depthMapFBO);
@@ -201,6 +208,9 @@ int main() {
         //trash
         const glm::vec3 model6_position {-3.0f, 0.0f, 0.0f};
         const glm::vec3 model6_scale {2.0f};
+        //dumpsters
+        const glm::vec3 model7_position {-5.0f, 0.0f, 0.0f};
+        const glm::vec3 model7_scale {2.0f};
 
 
         //---------------------------RENDER SHADOW DEPTH PIPELINE--------------------------------------
@@ -211,6 +221,7 @@ int main() {
         sceneRender.renderModel(simpleDepthShader, &model4, model4_position, model4_scale);
         sceneRender.renderModel(simpleDepthShader, &model5, model5_position, model5_scale);
         sceneRender.renderModel(simpleDepthShader, &model6, model6_position, model6_scale);
+        sceneRender.renderModel(simpleDepthShader, &model7, model7_position, model7_scale);
 
 
         glCullFace(GL_BACK);
@@ -257,6 +268,9 @@ int main() {
 
         sceneRender.processShaderPipeline(trash_albedo, trash_normal, trash_metallic, trash_roughness, trash_ao, depthMap, 
             pbrShader, &model6, model6_position, model6_scale);
+
+        sceneRender.processShaderPipeline(dumpsters_albedo, dumpsters_normal, dumpsters_metallic, dumpsters_roughness, dumpsters_ao, depthMap, 
+            pbrShader, &model7, model7_position, model7_scale);
 
         glfwSwapBuffers(window);
         glfwPollEvents();
