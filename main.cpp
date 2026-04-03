@@ -67,7 +67,7 @@ int main() {
     }
 
     glEnable(GL_DEPTH_TEST);
-    glEnable(GL_CULL_FACE);
+    //glEnable(GL_CULL_FACE);
 
     // Build and compile shaders
     Shader pbrShader("shaders/pbr.vs", "shaders/pbr.fs");
