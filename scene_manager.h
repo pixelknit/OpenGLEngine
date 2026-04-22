@@ -67,6 +67,7 @@ class SceneUtils{
   }
 
   void processShaderPipeline(
+      unsigned int &envMap,
       unsigned int &albedo,
       unsigned int &normal,
       unsigned int &metallic,
@@ -80,6 +81,8 @@ class SceneUtils{
       )
   {
 
+    glActiveTexture(GL_TEXTURE5);
+    glBindTexture(GL_TEXTURE_2D, envMap);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, albedo);
     glActiveTexture(GL_TEXTURE1);
