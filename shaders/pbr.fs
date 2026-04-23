@@ -171,7 +171,7 @@ void main() {
     vec3 ambient = (kD * diffuseIBL + specularIBL) * ao * envMapIntensity;
 
     float hemisphericAO = clamp(dot(N, vec3(0,1,0)) * 0.5 + 0.5, 0.2, 1.0);
-    ambient *= hemisphericAO * ao;
+    ambient *= hemisphericAO;
     // === END REPLACEMENT ===
     
     vec3 color = ambient + Lo;
