@@ -77,7 +77,7 @@ int main() {
     Model model1("ground","models/plane/simple_plane.obj");  
     Model model2("cup", "models/cup/cup.obj");
     Model model3("table", "models/table/table.obj"); 
-    Model model4("rock", "models/coast_rock/coast_rock.obj"); 
+    Model model4("building", "models/building/build_asset12.obj"); 
     Model model5("sphere", "models/table/sphere.obj"); 
     Model model6("trash", "models/trash_bags/trash_bags.obj"); 
     Model model7("dumpsters", "models/dumpsters/dumpsters.obj"); 
@@ -104,11 +104,11 @@ int main() {
     unsigned int table_roughness = loadTexture("models/table/roughness.png");
     unsigned int table_ao        = loadTexture("models/table/ao.png");
 
-    unsigned int rock_albedo     = loadTexture("models/coast_rock/albedo.png");
-    unsigned int rock_normal     = loadTexture("models/coast_rock/normal.png");
-    unsigned int rock_metallic   = loadTexture("models/coast_rock/metallic.png");
-    unsigned int rock_roughness  = loadTexture("models/coast_rock/roughness.png");
-    unsigned int rock_ao         = loadTexture("models/coast_rock/ao.png");
+    unsigned int building_albedo     = loadTexture("models/building/albedo.png");
+    unsigned int building_normal     = loadTexture("models/building/normal.png");
+    unsigned int building_metallic   = loadTexture("models/building/metallic.png");
+    unsigned int building_roughness  = loadTexture("models/building/roughness.png");
+    unsigned int building_ao         = loadTexture("models/building/ao.png");
 
     unsigned int trash_albedo     = loadTexture("models/trash_bags/albedo.png");
     unsigned int trash_normal     = loadTexture("models/trash_bags/normal.png");
@@ -143,14 +143,15 @@ int main() {
 
     // Light setup (use first light as "sun" for shadows)
     glm::vec3 lightPos(-2.0f, 4.0f, -1.0f);
+    glm::vec3 lightPos2(5.0f, 5.0f, 5.0f);
     glm::vec3 lightColors[] = {
         glm::vec3(300.0f, 300.0f, 300.0f),
         glm::vec3(100.0f, 100.0f, 100.0f),
-        glm::vec3(100.0f, 100.0f, 100.0f)
+        glm::vec3(100.0f, 100.0f, 200.0f)
     };
     glm::vec3 lightPositions[] = {
         lightPos,
-        glm::vec3(10.0f, -10.0f, 10.0f),
+        lightPos2,
         glm::vec3(-10.0f, 10.0f, 10.0f)
     };
 
@@ -174,7 +175,7 @@ int main() {
         // Render depth of scene to texture (from light's perspective)
         // scene bounds
         float sceneRadius =          10.0f;
-        glm::mat4 lightProjection =  glm::ortho(-sceneRadius, sceneRadius, -sceneRadius, sceneRadius, 0.1f, 10.0f);
+        glm::mat4 lightProjection =  glm::ortho(-sceneRadius, sceneRadius, -sceneRadius, sceneRadius, 0.1f, 20.0f);
         glm::mat4 lightView =        glm::lookAt(lightPos, glm::vec3(0.0f), glm::vec3(0.0, 1.0, 0.0));
         glm::mat4 lightSpaceMatrix = lightProjection * lightView;
         
@@ -199,9 +200,11 @@ int main() {
         //table
         const glm::vec3 model3_position {1.0f, 1.0f, 0.0f};
         const glm::vec3 model3_scale {0.02f};
-        //rock
+        //building
         const glm::vec3 model4_position {12.0f, 0.0f, 0.0f};
         const glm::vec3 model4_scale {1.0f};
+        const glm::vec3 model4_position2 {-20.0f, 0.0f, 0.0f};
+        const glm::vec3 model4_scale2 {1.0f};
         //sphere
         const glm::vec3 model5_position {1.0f, 4.0f, 0.0f};
         const glm::vec3 model5_scale {0.5f};
@@ -219,6 +222,7 @@ int main() {
         sceneRender.renderModel(simpleDepthShader, &model2, model2_position, model2_scale);
         sceneRender.renderModel(simpleDepthShader, &model3, model3_position, model3_scale);
         sceneRender.renderModel(simpleDepthShader, &model4, model4_position, model4_scale);
+        sceneRender.renderModel(simpleDepthShader, &model4, model4_position2, model4_scale2);
         sceneRender.renderModel(simpleDepthShader, &model5, model5_position, model5_scale);
         sceneRender.renderModel(simpleDepthShader, &model6, model6_position, model6_scale);
         sceneRender.renderModel(simpleDepthShader, &model7, model7_position, model7_scale);
@@ -260,8 +264,11 @@ int main() {
         sceneRender.processShaderPipeline(table_albedo, table_normal, table_metallic, table_roughness, table_ao, depthMap,
             pbrShader, &model3, model3_position, model3_scale);
 
-        sceneRender.processShaderPipeline(rock_albedo, rock_normal, rock_metallic, rock_roughness, rock_ao, depthMap,
+        sceneRender.processShaderPipeline(building_albedo, building_normal, building_metallic, building_roughness, building_ao, depthMap,
             pbrShader, &model4, model4_position, model4_scale);
+
+        sceneRender.processShaderPipeline(building_albedo, building_normal, building_metallic, building_roughness, building_ao, depthMap,
+            pbrShader, &model4, model4_position2, model4_scale2);
 
         sceneRender.processShaderPipeline(albedo, normal, metallic, roughness, ao, depthMap, 
             pbrShader, &model5, model5_position, model5_scale);
