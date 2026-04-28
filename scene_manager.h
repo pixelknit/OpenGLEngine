@@ -67,6 +67,7 @@ class SceneUtils{
   }
 
   void processShaderPipeline(
+      unsigned int &envMap,
       unsigned int &albedo,
       unsigned int &normal,
       unsigned int &metallic,
@@ -90,8 +91,10 @@ class SceneUtils{
     glBindTexture(GL_TEXTURE_2D, roughness);
     glActiveTexture(GL_TEXTURE4);
     glBindTexture(GL_TEXTURE_2D, ao);
-    glActiveTexture(GL_TEXTURE5);  // Shadow map
+    glActiveTexture(GL_TEXTURE5);
     glBindTexture(GL_TEXTURE_2D, depthMap);
+    glActiveTexture(GL_TEXTURE6);
+    glBindTexture(GL_TEXTURE_2D, envMap);
 
     renderModel(pbrShader, model, model_position, model_scale);
     

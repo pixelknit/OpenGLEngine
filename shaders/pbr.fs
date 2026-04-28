@@ -19,9 +19,34 @@ uniform sampler2D metallicMap;
 uniform sampler2D roughnessMap;
 uniform sampler2D aoMap;
 
+// === ADD THESE UNIFORMS ===
+uniform sampler2D envMap;
+uniform float envMapIntensity;
+
 const float PI = 3.14159265359;
 
-// Shadow calculation function
+// === ADD THESE IBL FUNCTIONS ===
+const vec2 invAtan = vec2(0.1591, 0.3183);
+
+vec2 SampleSphericalMap(vec3 v) {
+    vec2 uv = vec2(atan(v.z, v.x), asin(v.y));
+    uv *= invAtan;
+    uv += 0.5;
+    return uv;
+}
+
+vec3 SampleEnvMap(vec3 R, float roughness) {
+    float mipLevel = roughness * 4.0;
+    vec2 uv = SampleSphericalMap(R);
+    return textureLod(envMap, uv, mipLevel).rgb;
+}
+
+vec3 SampleDiffuseEnv(vec3 N) {
+    vec2 uv = SampleSphericalMap(N);
+    return textureLod(envMap, uv, 5.0).rgb;
+}
+
+// Shadow calculation function (keep exactly as you have it)
 float ShadowCalculation(vec4 fragPosLightSpace, vec3 normal, vec3 lightDir) {
     vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
     projCoords = projCoords * 0.5 + 0.5;
@@ -48,6 +73,7 @@ float ShadowCalculation(vec4 fragPosLightSpace, vec3 normal, vec3 lightDir) {
     return shadow;
 }
 
+// Keep all your existing PBR functions exactly as they are:
 vec3 getNormalFromMap() {
     vec3 tangentNormal = texture(normalMap, TexCoords).xyz * 2.0 - 1.0;
     return normalize(TBN * tangentNormal);
@@ -95,7 +121,7 @@ void main() {
     vec3 F0 = vec3(0.04); 
     F0 = mix(F0, albedo, metallic);
 
-    // Only first light casts shadows for simplicity
+    // === DIRECT LIGHTING (keep exactly as you have it) ===
     vec3 Lo = vec3(0.0);
     for(int i = 0; i < 4; ++i) {
         vec3 L = normalize(lightPositions[i] - WorldPos);
@@ -119,7 +145,6 @@ void main() {
         
         vec3 lighting = (kD * albedo / PI + specular) * radiance * NdotL;
         
-        // Apply shadow only for first light (directional-like)
         if(i == 0 && shadows) {
             float shadow = ShadowCalculation(FragPosLightSpace, N, L);
             lighting *= (1.0 - shadow);
@@ -128,7 +153,28 @@ void main() {
         Lo += lighting;
     }
    
-    vec3 ambient = vec3(0.03) * albedo * ao;
+    // === REPLACE THIS AMBIENT BLOCK ===
+    // OLD:
+    // vec3 ambient = vec3(0.03) * albedo * ao;
+    
+    // NEW IBL AMBIENT:
+    vec3 R = reflect(-V, N);
+    vec3 envColor = SampleEnvMap(R, roughness);
+    vec3 envDiffuse = SampleDiffuseEnv(N);
+    
+    vec3 F = fresnelSchlick(max(dot(N, V), 0.0), F0);
+    vec3 kS = F;
+    vec3 kD = vec3(1.0) - kS;
+    kD *= 1.0 - metallic;
+    
+    vec3 diffuseIBL = envDiffuse * albedo;
+    vec3 specularIBL = envColor * F;
+    vec3 ambient = (kD * diffuseIBL + specularIBL) * ao * envMapIntensity;
+
+    float hemisphericAO = clamp(dot(N, vec3(0,1,0)) * 0.5 + 0.5, 0.2, 1.0);
+    ambient *= hemisphericAO;
+    // === END REPLACEMENT ===
+    
     vec3 color = ambient + Lo;
     color = color / (color + vec3(1.0));
     color = pow(color, vec3(1.0/2.2)); 

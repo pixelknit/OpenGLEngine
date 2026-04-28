@@ -17,7 +17,8 @@ uniform mat4 model;
 uniform mat4 lightSpaceMatrix; 
 
 void main() {
-    TexCoords = vec2(aTexCoords.x, 1.0 - aTexCoords.y);
+    //TexCoords = vec2(aTexCoords.x, 1.0 - aTexCoords.y);
+    TexCoords = aTexCoords;
     WorldPos = vec3(model * vec4(aPos, 1.0));
     FragPosLightSpace = lightSpaceMatrix * vec4(WorldPos, 1.0);
     
