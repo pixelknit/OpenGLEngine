@@ -1,5 +1,6 @@
 #version 330 core
-out vec4 FragColor;
+layout(location = 0) out vec4 FragColor;
+layout(location = 1) out vec4 gNormal; // view-space normal (encoded) + roughness in alpha
 
 in vec2 TexCoords;
 in vec3 WorldPos;
@@ -22,6 +23,7 @@ uniform sampler2D aoMap;
 // === ADD THESE UNIFORMS ===
 uniform sampler2D envMap;
 uniform float envMapIntensity;
+uniform mat4 view;
 
 const float PI = 3.14159265359;
 
@@ -175,8 +177,11 @@ void main() {
     // === END REPLACEMENT ===
     
     vec3 color = ambient + Lo;
-    color = color / (color + vec3(1.0));
-    color = pow(color, vec3(1.0/2.2)); 
 
+    // Output linear HDR — tone mapping happens in the SSR composite pass
     FragColor = vec4(color, 1.0);
+
+    // Output view-space normal + roughness for SSR
+    vec3 N_view = normalize(mat3(view) * N);
+    gNormal = vec4(N_view * 0.5 + 0.5, roughness);
 }

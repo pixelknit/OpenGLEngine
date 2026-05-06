@@ -37,6 +37,21 @@ const unsigned int SHADOW_WIDTH = shadow_dim, SHADOW_HEIGHT = shadow_dim;
 unsigned int depthMapFBO;
 unsigned int depthMap;
 
+// Scene FBO for SSR (color + normals + depth)
+unsigned int sceneFBO;
+unsigned int sceneColorTex, sceneNormalTex, sceneDepthTex;
+
+// Fullscreen quad for SSR composite pass
+unsigned int quadVAO, quadVBO;
+float quadVertices[] = {
+    -1.0f,  1.0f,  0.0f, 1.0f,
+    -1.0f, -1.0f,  0.0f, 0.0f,
+     1.0f, -1.0f,  1.0f, 0.0f,
+    -1.0f,  1.0f,  0.0f, 1.0f,
+     1.0f, -1.0f,  1.0f, 0.0f,
+     1.0f,  1.0f,  1.0f, 1.0f
+};
+
 // Helper function to render scene
 SceneUtils sceneRender = SceneUtils();
 
@@ -96,6 +111,62 @@ void initSkybox() {
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
 }
 
+void initSceneFBO() {
+    glGenFramebuffers(1, &sceneFBO);
+    glBindFramebuffer(GL_FRAMEBUFFER, sceneFBO);
+
+    // Attachment 0: linear HDR scene color
+    glGenTextures(1, &sceneColorTex);
+    glBindTexture(GL_TEXTURE_2D, sceneColorTex);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGBA, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, sceneColorTex, 0);
+
+    // Attachment 1: view-space normals (encoded) + roughness in alpha
+    glGenTextures(1, &sceneNormalTex);
+    glBindTexture(GL_TEXTURE_2D, sceneNormalTex);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGBA, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, sceneNormalTex, 0);
+
+    // Depth texture (must be sampleable for SSR position reconstruction)
+    glGenTextures(1, &sceneDepthTex);
+    glBindTexture(GL_TEXTURE_2D, sceneDepthTex);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, SCR_WIDTH, SCR_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, sceneDepthTex, 0);
+
+    unsigned int attachments[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
+    glDrawBuffers(2, attachments);
+
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+        std::cout << "Scene FBO incomplete!" << std::endl;
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+void initQuad() {
+    glGenVertexArrays(1, &quadVAO);
+    glGenBuffers(1, &quadVBO);
+    glBindVertexArray(quadVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), quadVertices, GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
+    glBindVertexArray(0);
+}
+
 void renderSkybox(Shader &skyboxShader, unsigned int envMap) {
     glDepthFunc(GL_LEQUAL);
     skyboxShader.use();
@@ -139,8 +210,8 @@ int main() {
 
   // Build and compile shaders
   Shader pbrShader("shaders/pbr.vs", "shaders/pbr.fs");
-  Shader simpleDepthShader("shaders/shadow_depth.vs",
-                           "shaders/shadow_depth.fs");
+  Shader simpleDepthShader("shaders/shadow_depth.vs", "shaders/shadow_depth.fs");
+  Shader ssrShader("shaders/ssr.vs", "shaders/ssr.fs");
 
   // Load multiple models (can be same file or different)
   Model model1("ground", "models/plane/simple_plane.obj");
@@ -151,6 +222,8 @@ int main() {
   /////////env map///////
   Shader skyboxShader("shaders/skybox.vs", "shaders/skybox.fs");
   initSkybox();
+  initSceneFBO();
+  initQuad();
 
   // Load environment map (download any free HDRi from hdrihaven.com/polyhaven.com)
   // Or use a JPG/PNG - it works too, just less dynamic range
@@ -227,6 +300,11 @@ int main() {
   skyboxShader.use();
   skyboxShader.setInt("envMap", 0);
 
+  ssrShader.use();
+  ssrShader.setInt("sceneTex", 0);
+  ssrShader.setInt("normalTex", 1);
+  ssrShader.setInt("depthTex",  2);
+
   while (!glfwWindowShouldClose(window)) {
     float currentFrame = glfwGetTime();
     deltaTime = currentFrame - lastFrame;
@@ -283,62 +361,69 @@ int main() {
     glCullFace(GL_BACK);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-    // Render scene as normal with shadow mapping
+    glm::mat4 view = camera.GetViewMatrix();
+    glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+
+    //---------------------------PASS 2: SCENE GEOMETRY → sceneFBO
     glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
+    glBindFramebuffer(GL_FRAMEBUFFER, sceneFBO);
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    //////env map///update
-    glm::mat4 view = camera.GetViewMatrix();
-    glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH/(float)SCR_HEIGHT, 0.1f, 100.0f);
-
-    // Remove translation from view matrix for skybox (infinite distance)
+    // Skybox only writes to color attachment (no normals needed for sky)
+    unsigned int skyAttachment = GL_COLOR_ATTACHMENT0;
+    glDrawBuffers(1, &skyAttachment);
     glm::mat4 skyView = glm::mat4(glm::mat3(view));
-
     skyboxShader.use();
     skyboxShader.setMat4("projection", projection);
     skyboxShader.setMat4("view", skyView);
     renderSkybox(skyboxShader, envMap);
 
-    pbrShader.use();
-    // pbrShader_cup.use();
-    // pbrShader_table.use();
+    // PBR geometry writes to both color and normal attachments (MRT)
+    unsigned int bothAttachments[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
+    glDrawBuffers(2, bothAttachments);
 
-    // glm::mat4 projection =
-    //     glm::perspective(glm::radians(camera.Zoom),
-    //                      (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
-    // glm::mat4 view = camera.GetViewMatrix();
+    pbrShader.use();
     pbrShader.setMat4("projection", projection);
     pbrShader.setMat4("view", view);
     pbrShader.setVec3("camPos", camera.Position);
     pbrShader.setMat4("lightSpaceMatrix", lightSpaceMatrix);
 
-    // Set lights
     for (unsigned int i = 0; i < 3; ++i) {
-      pbrShader.setVec3("lightPositions[" + std::to_string(i) + "]",
-                        lightPositions[i]);
-      pbrShader.setVec3("lightColors[" + std::to_string(i) + "]",
-                        lightColors[i]);
+      pbrShader.setVec3("lightPositions[" + std::to_string(i) + "]", lightPositions[i]);
+      pbrShader.setVec3("lightColors["    + std::to_string(i) + "]", lightColors[i]);
     }
 
-    //---------------------------RENDER SHADER GEOM
-    //PIPELINE--------------------------------------
-    // Bind textures
+    sceneRender.processShaderPipeline(envMap, albedo, normal, metallic, roughness, ao,
+                                      depthMap, pbrShader, &model1, model1_position, model1_scale);
+    sceneRender.processShaderPipeline(envMap, cup_albedo, cup_normal, cup_metallic, cup_roughness, cup_ao,
+                                      depthMap, pbrShader, &model2, model2_position, model2_scale);
+    sceneRender.processShaderPipeline(envMap, table_albedo, table_normal, table_metallic, table_roughness, table_ao,
+                                      depthMap, pbrShader, &model3, model3_position, model3_scale);
+    sceneRender.processShaderPipeline(envMap, rock_albedo, rock_normal, rock_metallic, rock_roughness, rock_ao,
+                                      depthMap, pbrShader, &model4, model4_position, model4_scale);
 
-    sceneRender.processShaderPipeline(envMap,albedo, normal, metallic, roughness, ao,
-                                      depthMap, pbrShader, &model1,
-                                      model1_position, model1_scale);
+    //---------------------------PASS 3: SSR COMPOSITE → default framebuffer
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glClear(GL_COLOR_BUFFER_BIT);
+    glDisable(GL_DEPTH_TEST);
 
-    sceneRender.processShaderPipeline(envMap,
-        cup_albedo, cup_normal, cup_metallic, cup_roughness, cup_ao, depthMap,
-        pbrShader, &model2, model2_position, model2_scale);
+    ssrShader.use();
+    ssrShader.setMat4("projection",    projection);
+    ssrShader.setMat4("invProjection", glm::inverse(projection));
 
-    sceneRender.processShaderPipeline(envMap,
-        table_albedo, table_normal, table_metallic, table_roughness, table_ao,
-        depthMap, pbrShader, &model3, model3_position, model3_scale);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, sceneColorTex);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, sceneNormalTex);
+    glActiveTexture(GL_TEXTURE2);
+    glBindTexture(GL_TEXTURE_2D, sceneDepthTex);
 
-    sceneRender.processShaderPipeline(envMap,
-        rock_albedo, rock_normal, rock_metallic, rock_roughness, rock_ao,
-        depthMap, pbrShader, &model4, model4_position, model4_scale);
+    glBindVertexArray(quadVAO);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+    glBindVertexArray(0);
+
+    glEnable(GL_DEPTH_TEST);
 
     glfwSwapBuffers(window);
     glfwPollEvents();
