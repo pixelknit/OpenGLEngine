@@ -128,8 +128,8 @@ void main() {
     float rawRoughness = texture(roughnessMap, TexCoords).r;
     float roughness    = max(rawRoughness, minRoughness); // clamped value used for IBL/lighting
     float ao        = texture(aoMap, TexCoords).r;
-    
-    vec3 N = getNormalFromMap();
+    //test value for normal fix
+    vec3 N = getNormalFromMap() * 0.6;
     vec3 V = normalize(camPos - WorldPos);
     vec3 F0 = vec3(0.04); 
     F0 = mix(F0, albedo, metallic);
