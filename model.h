@@ -111,9 +111,20 @@ private:
                 glm::vec2 deltaUV1 = uv1-uv0;
                 glm::vec2 deltaUV2 = uv2-uv0;
                 
-                float r = 1.0f / (deltaUV1.x * deltaUV2.y - deltaUV1.y * deltaUV2.x);
-                glm::vec3 tangent = (deltaPos1 * deltaUV2.y   - deltaPos2 * deltaUV1.y)*r;
-                glm::vec3 bitangent = (deltaPos2 * deltaUV1.x   - deltaPos1 * deltaUV2.x)*r;
+                float det = deltaUV1.x * deltaUV2.y - deltaUV1.y * deltaUV2.x;
+                glm::vec3 tangent, bitangent;
+                if (glm::abs(det) < 1e-6f) {
+                    // Degenerate UV triangle (seam, zero-area UV, mirrored island).
+                    // Build an arbitrary tangent frame from the face normal instead.
+                    glm::vec3 faceN = glm::normalize(glm::cross(deltaPos1, deltaPos2));
+                    glm::vec3 up = (glm::abs(faceN.y) < 0.99f) ? glm::vec3(0,1,0) : glm::vec3(1,0,0);
+                    tangent   = glm::normalize(glm::cross(faceN, up));
+                    bitangent = glm::normalize(glm::cross(faceN, tangent));
+                } else {
+                    float r = 1.0f / det;
+                    tangent   = glm::normalize((deltaPos1 * deltaUV2.y - deltaPos2 * deltaUV1.y) * r);
+                    bitangent = glm::normalize((deltaPos2 * deltaUV1.x - deltaPos1 * deltaUV2.x) * r);
+                }
                 
                 vertices[i].Tangent = tangent;
                 vertices[i].Bitangent = bitangent;

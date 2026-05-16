@@ -289,8 +289,9 @@ int main() {
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
   // Light setup (use first light as "sun" for shadows)
+  const float sunLightValue = 100.0f;
   glm::vec3 lightPos(-2.0f, 4.0f, -1.0f);
-  glm::vec3 lightColors[] = {glm::vec3(300.0f, 300.0f, 300.0f),
+  glm::vec3 lightColors[] = {glm::vec3(sunLightValue, sunLightValue, sunLightValue),
                              glm::vec3(100.0f, 100.0f, 100.0f),
                              glm::vec3(100.0f, 100.0f, 100.0f)};
   glm::vec3 lightPositions[] = {lightPos, glm::vec3(10.0f, -10.0f, 10.0f),
@@ -306,7 +307,7 @@ int main() {
   pbrShader.setInt("aoMap", 4);
   pbrShader.setInt("shadowMap", 5); // Shadow map in here :)
   pbrShader.setInt("envMap", 6);
-  pbrShader.setFloat("envMapIntensity", 0.4f);
+  pbrShader.setFloat("envMapIntensity", 0.8f);
   pbrShader.setFloat("minRoughness",    0.35f); // prevents mirror-smooth surfaces
   pbrShader.setFloat("metallicMult",    0.5f);  // table textures run ~0.81 mean; pull back
 

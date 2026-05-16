@@ -23,9 +23,19 @@ void main() {
     FragPosLightSpace = lightSpaceMatrix * vec4(WorldPos, 1.0);
     
     mat3 normalMatrix = transpose(inverse(mat3(model)));
-    vec3 T = normalize(normalMatrix * aTangent);
-    vec3 B = normalize(normalMatrix * aBitangent);
     vec3 N = normalize(normalMatrix * aNormal);
+
+    // Gram-Schmidt: re-derive T perpendicular to N, fall back if T is NaN/degenerate
+    vec3 Traw = normalMatrix * aTangent;
+    float Tlen = dot(Traw, Traw);
+    vec3 T;
+    if (Tlen > 1e-10 && Tlen == Tlen) {       // Tlen != Tlen catches NaN
+        T = normalize(Traw - dot(Traw, N) * N);
+    } else {
+        vec3 up = abs(N.y) < 0.99 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
+        T = normalize(cross(N, up));
+    }
+    vec3 B = cross(N, T);                      // always orthogonal; ignores aBitangent
     TBN = mat3(T, B, N);
     Normal = N;
     

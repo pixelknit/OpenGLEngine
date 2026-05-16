@@ -43,6 +43,7 @@ vec2 RayMarch(vec3 P, vec3 R) {
             for (int j = 0; j < SSR_BINARY_STEPS; j++) {
                 vec3 mid      = (lo + hi) * 0.5;
                 vec4 midClip  = projection * vec4(mid, 1.0);
+                if (midClip.w <= 0.0) break;
                 vec2 midUV    = (midClip.xy / midClip.w) * 0.5 + 0.5;
                 vec3 midScene = ReconstructViewPos(midUV, texture(depthTex, midUV).r);
                 if (mid.z < midScene.z) hi = mid; else lo = mid;
@@ -82,8 +83,9 @@ void main() {
         }
     }
 
-    // Tone mapping + gamma (single pass, scene is linear HDR)
-    finalColor = finalColor / (finalColor + vec3(1.0));
+    // ACES filmic tone mapping + gamma
+    const float a = 2.51, b = 0.03, c = 2.43, d = 0.59, e = 0.14;
+    finalColor = clamp((finalColor*(a*finalColor+b))/(finalColor*(c*finalColor+d)+e), 0.0, 1.0);
     finalColor = pow(finalColor, vec3(1.0 / 2.2));
     FragColor  = vec4(finalColor, 1.0);
 }

@@ -33,7 +33,7 @@ const float PI = 3.14159265359;
 const vec2 invAtan = vec2(0.1591, 0.3183);
 
 vec2 SampleSphericalMap(vec3 v) {
-    vec2 uv = vec2(atan(v.z, v.x), asin(v.y));
+    vec2 uv = vec2(atan(v.z, v.x), asin(clamp(v.y, -1.0, 1.0)));
     uv *= invAtan;
     uv += 0.5;
     return uv;
@@ -79,7 +79,11 @@ float ShadowCalculation(vec4 fragPosLightSpace, vec3 normal, vec3 lightDir) {
 // Keep all your existing PBR functions exactly as they are:
 vec3 getNormalFromMap() {
     vec3 tangentNormal = texture(normalMap, TexCoords).xyz * 2.0 - 1.0;
-    return normalize(TBN * tangentNormal);
+    vec3 result = TBN * tangentNormal;
+    float lenSq = dot(result, result);
+    // !(lenSq > eps) catches both NaN (NaN comparisons are always false) and zero-length
+    if (!(lenSq > 1e-8)) return normalize(Normal);
+    return result * inversesqrt(lenSq);
 }
 
 float DistributionGGX(vec3 N, vec3 H, float roughness) {
@@ -176,8 +180,12 @@ void main() {
     vec3 kD = vec3(1.0) - kS;
     kD *= 1.0 - metallic;
 
+    // Approximate split-sum BRDF: attenuate specular by (1 - roughness^2) so
+    // rough surfaces don't get full mirror-like env contribution.
+    float NdotV = max(dot(N, V), 0.0);
+    float brdfScale = mix(1.0 - roughness * roughness, 1.0, NdotV * NdotV);
     vec3 diffuseIBL = envDiffuse * albedo;
-    vec3 specularIBL = envColor * F;
+    vec3 specularIBL = envColor * F * brdfScale;
     vec3 ambient = (kD * diffuseIBL + specularIBL) * ao * envMapIntensity;
 
     float hemisphericAO = clamp(dot(N, vec3(0,1,0)) * 0.5 + 0.5, 0.2, 1.0);
