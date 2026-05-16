@@ -294,8 +294,10 @@ int main() {
   pbrShader.setInt("roughnessMap", 3);
   pbrShader.setInt("aoMap", 4);
   pbrShader.setInt("shadowMap", 5); // Shadow map in here :)
-  pbrShader.setInt("envMap", 6);      // Texture unit 5
-  pbrShader.setFloat("envMapIntensity", 1.0f);
+  pbrShader.setInt("envMap", 6);
+  pbrShader.setFloat("envMapIntensity", 0.4f);
+  pbrShader.setFloat("minRoughness",    0.35f); // prevents mirror-smooth surfaces
+  pbrShader.setFloat("metallicMult",    0.5f);  // table textures run ~0.81 mean; pull back
 
   skyboxShader.use();
   skyboxShader.setInt("envMap", 0);

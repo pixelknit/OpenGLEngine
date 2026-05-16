@@ -61,8 +61,8 @@ void main() {
     vec4  normalRoughness = texture(normalTex, TexCoords);
     float roughness      = normalRoughness.a;
 
-    // Only apply SSR to smooth surfaces
-    float ssrStrength = clamp(1.0 - roughness * 2.5, 0.0, 1.0);
+    // Only apply SSR to smooth surfaces (roughness < ~0.33)
+    float ssrStrength = clamp(1.0 - roughness * 3.0, 0.0, 1.0);
     ssrStrength *= ssrStrength;
 
     vec3 finalColor = sceneColor;

@@ -24,6 +24,8 @@ uniform sampler2D aoMap;
 uniform sampler2D envMap;
 uniform float envMapIntensity;
 uniform mat4 view;
+uniform float minRoughness; // clamps texture roughness from below
+uniform float metallicMult; // 0–1 scale for metallic texture
 
 const float PI = 3.14159265359;
 
@@ -111,10 +113,16 @@ vec3 fresnelSchlick(float cosTheta, vec3 F0) {
     return F0 + (1.0 - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
 }
 
+// IBL variant: clamps Fresnel peak to (1 - roughness) so rough surfaces can't look wet/metallic
+vec3 fresnelSchlickRoughness(float cosTheta, vec3 F0, float roughness) {
+    return F0 + (max(vec3(1.0 - roughness), F0) - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+}
+
 void main() {
     vec3 albedo     = pow(texture(albedoMap, TexCoords).rgb, vec3(2.2));
-    float metallic  = texture(metallicMap, TexCoords).r;
-    float roughness = texture(roughnessMap, TexCoords).r;
+    float metallic     = texture(metallicMap, TexCoords).r * metallicMult;
+    float rawRoughness = texture(roughnessMap, TexCoords).r;
+    float roughness    = max(rawRoughness, minRoughness); // clamped value used for IBL/lighting
     float ao        = texture(aoMap, TexCoords).r;
     
     vec3 N = getNormalFromMap();
@@ -163,11 +171,11 @@ void main() {
     vec3 envColor = SampleEnvMap(R, roughness);
     vec3 envDiffuse = SampleDiffuseEnv(N);
     
-    vec3 F = fresnelSchlick(max(dot(N, V), 0.0), F0);
+    vec3 F = fresnelSchlickRoughness(max(dot(N, V), 0.0), F0, roughness);
     vec3 kS = F;
     vec3 kD = vec3(1.0) - kS;
     kD *= 1.0 - metallic;
-    
+
     vec3 diffuseIBL = envDiffuse * albedo;
     vec3 specularIBL = envColor * F;
     vec3 ambient = (kD * diffuseIBL + specularIBL) * ao * envMapIntensity;
@@ -181,7 +189,7 @@ void main() {
     // Output linear HDR — tone mapping happens in the SSR composite pass
     FragColor = vec4(color, 1.0);
 
-    // Output view-space normal + roughness for SSR
+    // Write original roughness (not the clamped one) so SSR sees actual surface smoothness
     vec3 N_view = normalize(mat3(view) * N);
-    gNormal = vec4(N_view * 0.5 + 0.5, roughness);
+    gNormal = vec4(N_view * 0.5 + 0.5, rawRoughness);
 }
