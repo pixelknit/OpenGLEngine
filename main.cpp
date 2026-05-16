@@ -307,7 +307,7 @@ int main() {
   pbrShader.setInt("aoMap", 4);
   pbrShader.setInt("shadowMap", 5); // Shadow map in here :)
   pbrShader.setInt("envMap", 6);
-  pbrShader.setFloat("envMapIntensity", 0.8f);
+  pbrShader.setFloat("envMapIntensity", 1.0f);
   pbrShader.setFloat("minRoughness",    0.35f); // prevents mirror-smooth surfaces
   pbrShader.setFloat("metallicMult",    0.5f);  // table textures run ~0.81 mean; pull back
 
