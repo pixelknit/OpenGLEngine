@@ -31,6 +31,17 @@ bool firstMouse = true;
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
 
+// Walk / fly toggle
+bool flyMode = false;
+bool qPreviouslyPressed = false;
+
+// Walk-mode physics
+float verticalVelocity = 0.0f;
+bool isOnGround = false;
+const float GRAVITY = -20.0f;
+const float JUMP_FORCE = 7.0f;
+const float PLAYER_EYE_HEIGHT = 3.5f;
+
 // Shadow map dimensions
 const unsigned int shadow_dim{1024};
 const unsigned int SHADOW_WIDTH = shadow_dim, SHADOW_HEIGHT = shadow_dim;
@@ -312,6 +323,19 @@ int main() {
     deltaTime = currentFrame - lastFrame;
     lastFrame = currentFrame;
 
+    // Walk-mode gravity
+    if (!flyMode) {
+      verticalVelocity += GRAVITY * deltaTime;
+      camera.Position.y += verticalVelocity * deltaTime;
+      if (camera.Position.y <= PLAYER_EYE_HEIGHT) {
+        camera.Position.y = PLAYER_EYE_HEIGHT;
+        verticalVelocity = 0.0f;
+        isOnGround = true;
+      } else {
+        isOnGround = false;
+      }
+    }
+
     processInput(window);
 
     // Shadow setup
@@ -439,14 +463,45 @@ void processInput(GLFWwindow *window) {
   if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
     glfwSetWindowShouldClose(window, true);
 
-  if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-    camera.ProcessKeyboard(FORWARD, deltaTime);
-  if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-    camera.ProcessKeyboard(BACKWARD, deltaTime);
-  if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-    camera.ProcessKeyboard(LEFT, deltaTime);
-  if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-    camera.ProcessKeyboard(RIGHT, deltaTime);
+  // Toggle fly / walk mode
+  bool qPressed = glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS;
+  if (qPressed && !qPreviouslyPressed) {
+    flyMode = !flyMode;
+    if (flyMode)
+      verticalVelocity = 0.0f;
+  }
+  qPreviouslyPressed = qPressed;
+
+  if (flyMode) {
+    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+      camera.ProcessKeyboard(FORWARD, deltaTime);
+    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+      camera.ProcessKeyboard(BACKWARD, deltaTime);
+    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+      camera.ProcessKeyboard(LEFT, deltaTime);
+    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+      camera.ProcessKeyboard(RIGHT, deltaTime);
+  } else {
+    // Horizontal-only movement
+    float velocity = camera.MovementSpeed * deltaTime;
+    glm::vec3 flatFront = glm::normalize(glm::vec3(camera.Front.x, 0.0f, camera.Front.z));
+    glm::vec3 flatRight = glm::normalize(glm::vec3(camera.Right.x, 0.0f, camera.Right.z));
+
+    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+      camera.Position += flatFront * velocity;
+    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+      camera.Position -= flatFront * velocity;
+    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+      camera.Position -= flatRight * velocity;
+    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+      camera.Position += flatRight * velocity;
+
+    // Jump
+    if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS && isOnGround) {
+      verticalVelocity = JUMP_FORCE;
+      isOnGround = false;
+    }
+  }
 }
 
 void framebuffer_size_callback(GLFWwindow *window, int width, int height) {
