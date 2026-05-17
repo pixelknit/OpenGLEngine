@@ -236,9 +236,8 @@ int main() {
   initSceneFBO();
   initQuad();
 
-  // Load environment map (download any free HDRi from hdrihaven.com/polyhaven.com)
-  // Or use a JPG/PNG - it works too, just less dynamic range
-  unsigned int envMap = loadEquirectangularMap("models/env_map.hdr"); // or .jpg
+  // Load environment map 
+  unsigned int envMap = loadEquirectangularMap("models/env_map.hdr");
 
   // vector<Model*> models {&model1, &model2, &model3};
 
@@ -288,13 +287,16 @@ int main() {
   glReadBuffer(GL_NONE);
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-  // Light setup (use first light as "sun" for shadows)
-  const float sunLightValue = 100.0f;
+  // Directional sun light — lightPos only used for shadow lookAt, not for shading
+  const float sunLightValue = 5.0f;
   glm::vec3 lightPos(-2.0f, 4.0f, -1.0f);
-  glm::vec3 lightColors[] = {glm::vec3(sunLightValue, sunLightValue, sunLightValue),
-                             glm::vec3(100.0f, 100.0f, 100.0f),
+  glm::vec3 sunDir = glm::normalize(lightPos); // direction from world toward sun
+  glm::vec3 sunColor = glm::vec3(sunLightValue);
+
+  // Remaining point lights
+  glm::vec3 lightColors[] = {glm::vec3(100.0f, 100.0f, 100.0f),
                              glm::vec3(100.0f, 100.0f, 100.0f)};
-  glm::vec3 lightPositions[] = {lightPos, glm::vec3(10.0f, -10.0f, 10.0f),
+  glm::vec3 lightPositions[] = {glm::vec3(10.0f, -10.0f, 10.0f),
                                 glm::vec3(-10.0f, 10.0f, 10.0f)};
 
   
@@ -416,7 +418,9 @@ int main() {
     pbrShader.setVec3("camPos", camera.Position);
     pbrShader.setMat4("lightSpaceMatrix", lightSpaceMatrix);
 
-    for (unsigned int i = 0; i < 3; ++i) {
+    pbrShader.setVec3("sunDirection", sunDir);
+    pbrShader.setVec3("sunColor", sunColor);
+    for (unsigned int i = 0; i < 2; ++i) {
       pbrShader.setVec3("lightPositions[" + std::to_string(i) + "]", lightPositions[i]);
       pbrShader.setVec3("lightColors["    + std::to_string(i) + "]", lightColors[i]);
     }

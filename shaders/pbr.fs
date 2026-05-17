@@ -9,10 +9,12 @@ in mat3 TBN;
 in vec4 FragPosLightSpace;
 
 uniform vec3 camPos;
+uniform vec3 sunDirection;       // direction FROM world TOWARD sun (world-space, normalized)
+uniform vec3 sunColor;           // sun irradiance (no attenuation)
 uniform vec3 lightPositions[4];
 uniform vec3 lightColors[4];
 uniform sampler2D shadowMap;
-uniform bool shadows = true; 
+uniform bool shadows = true;
 
 uniform sampler2D albedoMap;
 uniform sampler2D normalMap;
@@ -134,36 +136,58 @@ void main() {
     vec3 F0 = vec3(0.04); 
     F0 = mix(F0, albedo, metallic);
 
-    // === DIRECT LIGHTING (keep exactly as you have it) ===
+    // === DIRECT LIGHTING ===
     vec3 Lo = vec3(0.0);
-    for(int i = 0; i < 4; ++i) {
+
+    // --- Sun: global directional light (no distance attenuation) ---
+    {
+        vec3 L = normalize(sunDirection);
+        vec3 H = normalize(V + L);
+        vec3 radiance = sunColor;
+
+        float NDF = DistributionGGX(N, H, roughness);
+        float G   = GeometrySmith(N, V, L, roughness);
+        vec3  F   = fresnelSchlick(max(dot(H, V), 0.0), F0);
+
+        vec3 numerator    = NDF * G * F;
+        float denominator = 4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.0001;
+        vec3 specular = numerator / denominator;
+
+        vec3 kS = F;
+        vec3 kD = (vec3(1.0) - kS) * (1.0 - metallic);
+        float NdotL = max(dot(N, L), 0.0);
+
+        vec3 lighting = (kD * albedo / PI + specular) * radiance * NdotL;
+
+        if(shadows) {
+            float shadow = ShadowCalculation(FragPosLightSpace, N, L);
+            lighting *= (1.0 - shadow);
+        }
+
+        Lo += lighting;
+    }
+
+    // --- Point lights ---
+    for(int i = 0; i < 2; ++i) {
         vec3 L = normalize(lightPositions[i] - WorldPos);
         vec3 H = normalize(V + L);
         float distance = length(lightPositions[i] - WorldPos);
         float attenuation = 1.0 / (distance * distance);
         vec3 radiance = lightColors[i] * attenuation;
 
-        float NDF = DistributionGGX(N, H, roughness);   
-        float G   = GeometrySmith(N, V, L, roughness);      
+        float NDF = DistributionGGX(N, H, roughness);
+        float G   = GeometrySmith(N, V, L, roughness);
         vec3 F    = fresnelSchlick(max(dot(H, V), 0.0), F0);
-           
-        vec3 numerator    = NDF * G * F; 
+
+        vec3 numerator    = NDF * G * F;
         float denominator = 4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.0001;
         vec3 specular = numerator / denominator;
-        
+
         vec3 kS = F;
-        vec3 kD = vec3(1.0) - kS;
-        kD *= 1.0 - metallic;	  
+        vec3 kD = (vec3(1.0) - kS) * (1.0 - metallic);
         float NdotL = max(dot(N, L), 0.0);
-        
-        vec3 lighting = (kD * albedo / PI + specular) * radiance * NdotL;
-        
-        if(i == 0 && shadows) {
-            float shadow = ShadowCalculation(FragPosLightSpace, N, L);
-            lighting *= (1.0 - shadow);
-        }
-        
-        Lo += lighting;
+
+        Lo += (kD * albedo / PI + specular) * radiance * NdotL;
     }
    
     // === REPLACE THIS AMBIENT BLOCK ===
