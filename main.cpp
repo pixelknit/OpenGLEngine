@@ -25,8 +25,8 @@ void scroll_callback(GLFWwindow *window, double xoffset, double yoffset);
 void processInput(GLFWwindow *window);
 unsigned int loadTexture(const char *path);
 
-const unsigned int SCR_WIDTH = 1280;
-const unsigned int SCR_HEIGHT = 720;
+const unsigned int SCR_WIDTH = 1920;
+const unsigned int SCR_HEIGHT = 1080;
 
 Camera camera(glm::vec3(0.0f, 2.0f, 10.0f));
 float lastX = SCR_WIDTH / 2.0f;
@@ -48,7 +48,7 @@ const float JUMP_FORCE = 7.0f;
 const float PLAYER_EYE_HEIGHT = 3.5f;
 
 // Shadow map dimensions
-const unsigned int shadow_dim{1024};
+const unsigned int shadow_dim{2048};
 const unsigned int SHADOW_WIDTH = shadow_dim, SHADOW_HEIGHT = shadow_dim;
 unsigned int depthMapFBO;
 unsigned int depthMap;
@@ -294,7 +294,7 @@ int main() {
 
   // Directional sun light — lightPos only used for shadow lookAt, not for shading
   const float sunLightValue = 5.0f;
-  glm::vec3 lightPos(-2.0f, 4.0f, -1.0f);
+  glm::vec3 lightPos(-10.0f, 30.0f, -10.0f);
   glm::vec3 sunDir = glm::normalize(lightPos); // direction from world toward sun
   glm::vec3 sunColor = glm::vec3(sunLightValue);
 
@@ -348,10 +348,13 @@ int main() {
 
     // Shadow setup
     //  Render depth of scene to texture (from light's perspective)
+    // Ortho bounds must enclose the entire scene; rock is at x=12 so use ±35.
+    // Far plane extended to 100 so nothing gets clipped along the light ray.
     glm::mat4 lightProjection =
-        glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, 1.0f, 7.5f);
+        glm::ortho(-35.0f, 35.0f, -35.0f, 35.0f, 0.1f, 100.0f);
+    // Look toward scene center (~6,0,0) so the frustum is centered on content.
     glm::mat4 lightView =
-        glm::lookAt(lightPos, glm::vec3(0.0f), glm::vec3(0.0, 1.0, 0.0));
+        glm::lookAt(lightPos, glm::vec3(6.0f, 0.0f, 0.0f), glm::vec3(0.0, 1.0, 0.0));
     glm::mat4 lightSpaceMatrix = lightProjection * lightView;
 
     simpleDepthShader.use();

@@ -60,7 +60,9 @@ float ShadowCalculation(vec4 fragPosLightSpace, vec3 normal, vec3 lightDir) {
     float closestDepth = texture(shadowMap, projCoords.xy).r;
     float currentDepth = projCoords.z;
     
-    float bias = max(0.05 * (1.0 - dot(normal, lightDir)), 0.005);
+    // Scale bias for ortho frustum depth range (~100 units); old values (0.05/0.005)
+    // were tuned for a 6.5-unit frustum and ate shadows entirely at larger scale.
+    float bias = max(0.005 * (1.0 - dot(normal, lightDir)), 0.0005);
     float shadow = 0.0;
     
     vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
