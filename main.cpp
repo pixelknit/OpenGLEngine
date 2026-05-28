@@ -40,6 +40,11 @@ float lastFrame = 0.0f;
 bool flyMode = false;
 bool qPreviouslyPressed = false;
 
+// Run state (updated each frame by processInput, consumed by UpdateBob)
+bool isMoving = false;
+bool isRunning = false;
+const float RUN_SPEED_MULT = 2.2f;
+
 // Walk-mode physics
 float verticalVelocity = 0.0f;
 bool isOnGround = false;
@@ -345,6 +350,7 @@ int main() {
     }
 
     processInput(window);
+    camera.UpdateBob(deltaTime, isMoving, isRunning, isOnGround && !flyMode);
 
     // Shadow setup
     //  Render depth of scene to texture (from light's perspective)
@@ -485,29 +491,32 @@ void processInput(GLFWwindow *window) {
   }
   qPreviouslyPressed = qPressed;
 
+  isRunning = glfwGetKey(window, GLFW_KEY_LEFT_SHIFT)  == GLFW_PRESS ||
+              glfwGetKey(window, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS;
+
+  bool w = glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS;
+  bool s = glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS;
+  bool a = glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS;
+  bool d = glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS;
+  isMoving = w || s || a || d;
+
+  float speedMult = isRunning ? RUN_SPEED_MULT : 1.0f;
+
   if (flyMode) {
-    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-      camera.ProcessKeyboard(FORWARD, deltaTime);
-    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-      camera.ProcessKeyboard(BACKWARD, deltaTime);
-    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-      camera.ProcessKeyboard(LEFT, deltaTime);
-    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-      camera.ProcessKeyboard(RIGHT, deltaTime);
+    float velocity = camera.MovementSpeed * speedMult * deltaTime;
+    if (w) camera.Position += camera.Front  * velocity;
+    if (s) camera.Position -= camera.Front  * velocity;
+    if (a) camera.Position -= camera.Right  * velocity;
+    if (d) camera.Position += camera.Right  * velocity;
   } else {
-    // Horizontal-only movement
-    float velocity = camera.MovementSpeed * deltaTime;
+    float velocity = camera.MovementSpeed * speedMult * deltaTime;
     glm::vec3 flatFront = glm::normalize(glm::vec3(camera.Front.x, 0.0f, camera.Front.z));
     glm::vec3 flatRight = glm::normalize(glm::vec3(camera.Right.x, 0.0f, camera.Right.z));
 
-    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-      camera.Position += flatFront * velocity;
-    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-      camera.Position -= flatFront * velocity;
-    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-      camera.Position -= flatRight * velocity;
-    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-      camera.Position += flatRight * velocity;
+    if (w) camera.Position += flatFront * velocity;
+    if (s) camera.Position -= flatFront * velocity;
+    if (a) camera.Position -= flatRight * velocity;
+    if (d) camera.Position += flatRight * velocity;
 
     // Jump
     if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS && isOnGround) {

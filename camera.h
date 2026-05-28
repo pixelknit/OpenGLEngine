@@ -30,6 +30,8 @@ public:
     float MovementSpeed;
     float MouseSensitivity;
     float Zoom;
+    float BobTime   = 0.0f;
+    glm::vec3 BobOffset = glm::vec3(0.0f);
 
     Camera(glm::vec3 position = glm::vec3(0.0f, 0.0f, 0.0f), 
            glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f), 
@@ -44,7 +46,22 @@ public:
     }
 
     glm::mat4 GetViewMatrix() {
-        return glm::lookAt(Position, Position + Front, Up);
+        glm::vec3 eye = Position + BobOffset;
+        return glm::lookAt(eye, eye + Front, Up);
+    }
+
+    void UpdateBob(float deltaTime, bool isMoving, bool isRunning, bool onGround) {
+        if (isMoving && onGround) {
+            float freq = isRunning ? 14.0f : 9.0f;
+            float ampV = isRunning ? 0.07f : 0.035f;
+            BobTime += deltaTime * freq;
+            BobOffset = Up    * (glm::sin(BobTime)        * ampV)
+                      + Right * (glm::sin(BobTime * 0.5f) * ampV * 0.35f);
+        } else {
+            // Smoothly settle back to neutral when idle or airborne
+            float t = glm::min(deltaTime * 10.0f, 1.0f);
+            BobOffset = glm::mix(BobOffset, glm::vec3(0.0f), t);
+        }
     }
 
     void ProcessKeyboard(Camera_Movement direction, float deltaTime) {
