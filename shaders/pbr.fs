@@ -1,0 +1,229 @@
+#version 330 core
+layout(location = 0) out vec4 FragColor;
+layout(location = 1) out vec4 gNormal; // view-space normal (encoded) + roughness in alpha
+
+in vec2 TexCoords;
+in vec3 WorldPos;
+in vec3 Normal;
+in mat3 TBN;
+in vec4 FragPosLightSpace;
+
+uniform vec3 camPos;
+uniform vec3 sunDirection;       // direction FROM world TOWARD sun (world-space, normalized)
+uniform vec3 sunColor;           // sun irradiance (no attenuation)
+uniform vec3 lightPositions[4];
+uniform vec3 lightColors[4];
+uniform sampler2D shadowMap;
+uniform bool shadows = true;
+
+uniform sampler2D albedoMap;
+uniform sampler2D normalMap;
+uniform sampler2D metallicMap;
+uniform sampler2D roughnessMap;
+uniform sampler2D aoMap;
+
+// === ADD THESE UNIFORMS ===
+uniform sampler2D envMap;
+uniform float envMapIntensity;
+uniform mat4 view;
+uniform float minRoughness; // clamps texture roughness from below
+uniform float metallicMult; // 0–1 scale for metallic texture
+
+const float PI = 3.14159265359;
+
+// === ADD THESE IBL FUNCTIONS ===
+const vec2 invAtan = vec2(0.1591, 0.3183);
+
+vec2 SampleSphericalMap(vec3 v) {
+    vec2 uv = vec2(atan(v.z, v.x), asin(clamp(v.y, -1.0, 1.0)));
+    uv *= invAtan;
+    uv += 0.5;
+    return uv;
+}
+
+vec3 SampleEnvMap(vec3 R, float roughness) {
+    float mipLevel = roughness * 4.0;
+    vec2 uv = SampleSphericalMap(R);
+    return textureLod(envMap, uv, mipLevel).rgb;
+}
+
+vec3 SampleDiffuseEnv(vec3 N) {
+    vec2 uv = SampleSphericalMap(N);
+    return textureLod(envMap, uv, 5.0).rgb;
+}
+
+// Shadow calculation function (keep exactly as you have it)
+float ShadowCalculation(vec4 fragPosLightSpace, vec3 normal, vec3 lightDir) {
+    vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
+    projCoords = projCoords * 0.5 + 0.5;
+    
+    float closestDepth = texture(shadowMap, projCoords.xy).r;
+    float currentDepth = projCoords.z;
+    
+    // Scale bias for ortho frustum depth range (~100 units); old values (0.05/0.005)
+    // were tuned for a 6.5-unit frustum and ate shadows entirely at larger scale.
+    float bias = max(0.005 * (1.0 - dot(normal, lightDir)), 0.0005);
+    float shadow = 0.0;
+    
+    vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
+    for(int x = -1; x <= 1; ++x) {
+        for(int y = -1; y <= 1; ++y) {
+            float pcfDepth = texture(shadowMap, projCoords.xy + vec2(x, y) * texelSize).r;
+            shadow += currentDepth - bias > pcfDepth ? 1.0 : 0.0;
+        }
+    }
+    shadow /= 9.0;
+    
+    if(projCoords.z > 1.0)
+        shadow = 0.0;
+        
+    return shadow;
+}
+
+// Keep all your existing PBR functions exactly as they are:
+vec3 getNormalFromMap() {
+    vec3 tangentNormal = texture(normalMap, TexCoords).xyz * 2.0 - 1.0;
+    vec3 result = TBN * tangentNormal;
+    float lenSq = dot(result, result);
+    // !(lenSq > eps) catches both NaN (NaN comparisons are always false) and zero-length
+    if (!(lenSq > 1e-8)) return normalize(Normal);
+    return result * inversesqrt(lenSq);
+}
+
+float DistributionGGX(vec3 N, vec3 H, float roughness) {
+    float a = roughness*roughness;
+    float a2 = a*a;
+    float NdotH = max(dot(N, H), 0.0);
+    float NdotH2 = NdotH*NdotH;
+    float num   = a2;
+    float denom = (NdotH2 * (a2 - 1.0) + 1.0);
+    denom = PI * denom * denom;
+    return num / denom;
+}
+
+float GeometrySchlickGGX(float NdotV, float roughness) {
+    float r = (roughness + 1.0);
+    float k = (r*r) / 8.0;
+    float num   = NdotV;
+    float denom = NdotV * (1.0 - k) + k;
+    return num / denom;
+}
+
+float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness) {
+    float NdotV = max(dot(N, V), 0.0);
+    float NdotL = max(dot(N, L), 0.0);
+    float ggx2  = GeometrySchlickGGX(NdotV, roughness);
+    float ggx1  = GeometrySchlickGGX(NdotL, roughness);
+    return ggx1 * ggx2;
+}
+
+vec3 fresnelSchlick(float cosTheta, vec3 F0) {
+    return F0 + (1.0 - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+}
+
+// IBL variant: clamps Fresnel peak to (1 - roughness) so rough surfaces can't look wet/metallic
+vec3 fresnelSchlickRoughness(float cosTheta, vec3 F0, float roughness) {
+    return F0 + (max(vec3(1.0 - roughness), F0) - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+}
+
+void main() {
+    vec3 albedo     = pow(texture(albedoMap, TexCoords).rgb, vec3(2.2));
+    float metallic     = texture(metallicMap, TexCoords).r * metallicMult;
+    float rawRoughness = texture(roughnessMap, TexCoords).r;
+    float roughness    = max(rawRoughness, minRoughness); // clamped value used for IBL/lighting
+    float ao        = texture(aoMap, TexCoords).r;
+    //test value for normal fix
+    vec3 N = getNormalFromMap() * 0.6;
+    vec3 V = normalize(camPos - WorldPos);
+    vec3 F0 = vec3(0.04); 
+    F0 = mix(F0, albedo, metallic);
+
+    // === DIRECT LIGHTING ===
+    vec3 Lo = vec3(0.0);
+
+    // --- Sun: global directional light (no distance attenuation) ---
+    {
+        vec3 L = normalize(sunDirection);
+        vec3 H = normalize(V + L);
+        vec3 radiance = sunColor;
+
+        float NDF = DistributionGGX(N, H, roughness);
+        float G   = GeometrySmith(N, V, L, roughness);
+        vec3  F   = fresnelSchlick(max(dot(H, V), 0.0), F0);
+
+        vec3 numerator    = NDF * G * F;
+        float denominator = 4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.0001;
+        vec3 specular = numerator / denominator;
+
+        vec3 kS = F;
+        vec3 kD = (vec3(1.0) - kS) * (1.0 - metallic);
+        float NdotL = max(dot(N, L), 0.0);
+
+        vec3 lighting = (kD * albedo / PI + specular) * radiance * NdotL;
+
+        if(shadows) {
+            float shadow = ShadowCalculation(FragPosLightSpace, N, L);
+            lighting *= (1.0 - shadow);
+        }
+
+        Lo += lighting;
+    }
+
+    // --- Point lights ---
+    for(int i = 0; i < 2; ++i) {
+        vec3 L = normalize(lightPositions[i] - WorldPos);
+        vec3 H = normalize(V + L);
+        float distance = length(lightPositions[i] - WorldPos);
+        float attenuation = 1.0 / (distance * distance);
+        vec3 radiance = lightColors[i] * attenuation;
+
+        float NDF = DistributionGGX(N, H, roughness);
+        float G   = GeometrySmith(N, V, L, roughness);
+        vec3 F    = fresnelSchlick(max(dot(H, V), 0.0), F0);
+
+        vec3 numerator    = NDF * G * F;
+        float denominator = 4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.0001;
+        vec3 specular = numerator / denominator;
+
+        vec3 kS = F;
+        vec3 kD = (vec3(1.0) - kS) * (1.0 - metallic);
+        float NdotL = max(dot(N, L), 0.0);
+
+        Lo += (kD * albedo / PI + specular) * radiance * NdotL;
+    }
+   
+    // === REPLACE THIS AMBIENT BLOCK ===
+    // OLD:
+    // vec3 ambient = vec3(0.03) * albedo * ao;
+    
+    // NEW IBL AMBIENT:
+    vec3 R = reflect(-V, N);
+    vec3 envColor = SampleEnvMap(R, roughness);
+    vec3 envDiffuse = SampleDiffuseEnv(N);
+    
+    vec3 F = fresnelSchlickRoughness(max(dot(N, V), 0.0), F0, roughness);
+    vec3 kS = F;
+    vec3 kD = vec3(1.0) - kS;
+    kD *= 1.0 - metallic;
+
+    // Approximate split-sum BRDF: attenuate specular by (1 - roughness^2) so
+    // rough surfaces don't get full mirror-like env contribution.
+    float NdotV = max(dot(N, V), 0.0);
+    float brdfScale = mix(1.0 - roughness * roughness, 1.0, NdotV * NdotV);
+    vec3 diffuseIBL = envDiffuse * albedo;
+    vec3 specularIBL = envColor * F * brdfScale;
+    vec3 ambient = (kD * diffuseIBL + specularIBL) * ao * envMapIntensity;
+
+    float hemisphericAO = clamp(dot(N, vec3(0,1,0)) * 0.5 + 0.5, 0.2, 1.0);
+    ambient *= hemisphericAO;
+    // === END REPLACEMENT ===
+    
+    vec3 color = ambient + Lo;
+
+    // Output linear HDR — tone mapping happens in the SSR composite pass
+    FragColor = vec4(color, 1.0);
+
+    // Write original roughness (not the clamped one) so SSR sees actual surface smoothness
+    vec3 N_view = normalize(mat3(view) * N);
+    gNormal = vec4(N_view * 0.5 + 0.5, rawRoughness);
+}
