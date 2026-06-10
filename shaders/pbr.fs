@@ -1,6 +1,7 @@
 #version 330 core
 layout(location = 0) out vec4 FragColor;
-layout(location = 1) out vec4 gNormal; // view-space normal (encoded) + roughness in alpha
+layout(location = 1) out vec4 gNormal;  // view-space normal (encoded) + roughness in alpha
+layout(location = 2) out vec4 gAlbedo;  // linear albedo RGB + metallic A (for SSGI color bleeding)
 
 in vec2 TexCoords;
 in vec3 WorldPos;
@@ -226,4 +227,6 @@ void main() {
     // Write original roughness (not the clamped one) so SSR sees actual surface smoothness
     vec3 N_view = normalize(mat3(view) * N);
     gNormal = vec4(N_view * 0.5 + 0.5, rawRoughness);
+
+    gAlbedo = vec4(albedo, metallic);
 }

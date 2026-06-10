@@ -5,6 +5,8 @@ in vec2 TexCoords;
 uniform sampler2D sceneTex;   // linear HDR scene color
 uniform sampler2D normalTex;  // view-space normals (encoded) + roughness in alpha
 uniform sampler2D depthTex;   // scene depth
+uniform sampler2D ssgiTex;    // indirect diffuse from SSGI pass
+uniform sampler2D rsmTex;     // indirect diffuse from RSM pass
 
 uniform mat4 projection;
 uniform mat4 invProjection;
@@ -82,6 +84,10 @@ void main() {
             finalColor = mix(sceneColor, hitColor, ssrStrength * edgeFade);
         }
     }
+
+    // Add indirect diffuse — both screen-space (SSGI) and sun-bounce (RSM)
+    finalColor += texture(ssgiTex, TexCoords).rgb;
+    finalColor += texture(rsmTex,  TexCoords).rgb;
 
     // ACES filmic tone mapping + gamma
     const float a = 2.51, b = 0.03, c = 2.43, d = 0.59, e = 0.14;

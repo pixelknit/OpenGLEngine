@@ -58,9 +58,20 @@ const unsigned int SHADOW_WIDTH = shadow_dim, SHADOW_HEIGHT = shadow_dim;
 unsigned int depthMapFBO;
 unsigned int depthMap;
 
-// Scene FBO for SSR (color + normals + depth)
+// Scene FBO — color + normals + albedo (MRT) + depth
 unsigned int sceneFBO;
-unsigned int sceneColorTex, sceneNormalTex, sceneDepthTex;
+unsigned int sceneColorTex, sceneNormalTex, sceneDepthTex, sceneAlbedoTex;
+
+// SSGI FBO — indirect diffuse result
+unsigned int ssgiFBO;
+unsigned int ssgiColorTex;
+
+// RSM data textures (color attachments on depthMapFBO, shadow-map resolution)
+unsigned int rsmPosTex, rsmNormalTex, rsmFluxTex;
+
+// RSM indirect lighting result (screen resolution)
+unsigned int rsmIndirectFBO;
+unsigned int rsmIndirectTex;
 
 // Fullscreen quad for SSR composite pass
 unsigned int quadVAO, quadVBO;
@@ -156,7 +167,17 @@ void initSceneFBO() {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, sceneNormalTex, 0);
 
-    // Depth texture (must be sampleable for SSR position reconstruction)
+    // Attachment 2: linear albedo RGB + metallic A (for SSGI color bleeding)
+    glGenTextures(1, &sceneAlbedoTex);
+    glBindTexture(GL_TEXTURE_2D, sceneAlbedoTex);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, sceneAlbedoTex, 0);
+
+    // Depth texture (must be sampleable for SSR/SSGI position reconstruction)
     glGenTextures(1, &sceneDepthTex);
     glBindTexture(GL_TEXTURE_2D, sceneDepthTex);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, SCR_WIDTH, SCR_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
@@ -166,8 +187,8 @@ void initSceneFBO() {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, sceneDepthTex, 0);
 
-    unsigned int attachments[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
-    glDrawBuffers(2, attachments);
+    unsigned int attachments[3] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2 };
+    glDrawBuffers(3, attachments);
 
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
         std::cout << "Scene FBO incomplete!" << std::endl;
@@ -186,6 +207,44 @@ void initQuad() {
     glEnableVertexAttribArray(1);
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
     glBindVertexArray(0);
+}
+
+void initRSMIndirectFBO() {
+    glGenFramebuffers(1, &rsmIndirectFBO);
+    glBindFramebuffer(GL_FRAMEBUFFER, rsmIndirectFBO);
+
+    glGenTextures(1, &rsmIndirectTex);
+    glBindTexture(GL_TEXTURE_2D, rsmIndirectTex);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGB, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, rsmIndirectTex, 0);
+
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+        std::cout << "RSM indirect FBO incomplete!" << std::endl;
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+void initSSGIFBO() {
+    glGenFramebuffers(1, &ssgiFBO);
+    glBindFramebuffer(GL_FRAMEBUFFER, ssgiFBO);
+
+    glGenTextures(1, &ssgiColorTex);
+    glBindTexture(GL_TEXTURE_2D, ssgiColorTex);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGB, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, ssgiColorTex, 0);
+
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+        std::cout << "SSGI FBO incomplete!" << std::endl;
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 void renderSkybox(Shader &skyboxShader, unsigned int envMap) {
@@ -232,7 +291,10 @@ int main() {
   // Build and compile shaders
   Shader pbrShader("shaders/pbr.vs", "shaders/pbr.fs");
   Shader simpleDepthShader("shaders/shadow_depth.vs", "shaders/shadow_depth.fs");
+  Shader rsmDepthShader("shaders/rsm_depth.vs", "shaders/rsm_depth.fs");
+  Shader rsmIndirectShader("shaders/ssr.vs", "shaders/rsm_indirect.fs");
   Shader ssrShader("shaders/ssr.vs", "shaders/ssr.fs");
+  Shader ssgiShader("shaders/ssr.vs", "shaders/ssgi.fs");
 
   // Load multiple models (can be same file or different)
   Model model1("ground", "models/plane/simple_plane.obj");
@@ -245,6 +307,8 @@ int main() {
   initSkybox();
   initSceneFBO();
   initQuad();
+  initRSMIndirectFBO();
+  initSSGIFBO();
 
   // Load environment map 
   unsigned int envMap = loadEquirectangularMap("models/env_map.hdr");
@@ -293,6 +357,26 @@ int main() {
   glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D,
                          depthMap, 0);
+
+  // RSM color attachments — world position, normal, flux captured during shadow pass
+  auto makeRSMTex = [](unsigned int &id) {
+      glGenTextures(1, &id);
+      glBindTexture(GL_TEXTURE_2D, id);
+      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, shadow_dim, shadow_dim,
+                   0, GL_RGB, GL_FLOAT, NULL);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+  };
+  makeRSMTex(rsmPosTex);
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, rsmPosTex, 0);
+  makeRSMTex(rsmNormalTex);
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, rsmNormalTex, 0);
+  makeRSMTex(rsmFluxTex);
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, rsmFluxTex, 0);
+
+  // Keep default draw state as "none" — the render loop sets it explicitly each frame
   glDrawBuffer(GL_NONE);
   glReadBuffer(GL_NONE);
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -326,10 +410,28 @@ int main() {
   skyboxShader.use();
   skyboxShader.setInt("envMap", 0);
 
+  rsmDepthShader.use();
+  rsmDepthShader.setInt("albedoMap", 0);
+
+  rsmIndirectShader.use();
+  rsmIndirectShader.setInt("sceneNormalTex", 0);
+  rsmIndirectShader.setInt("sceneDepthTex",  1);
+  rsmIndirectShader.setInt("rsmPosTex",      2);
+  rsmIndirectShader.setInt("rsmNormalTex",   3);
+  rsmIndirectShader.setInt("rsmFluxTex",     4);
+
   ssrShader.use();
   ssrShader.setInt("sceneTex", 0);
   ssrShader.setInt("normalTex", 1);
   ssrShader.setInt("depthTex",  2);
+  ssrShader.setInt("ssgiTex",   3);
+  ssrShader.setInt("rsmTex",    4);
+
+  ssgiShader.use();
+  ssgiShader.setInt("sceneTex",  0);
+  ssgiShader.setInt("normalTex", 1);
+  ssgiShader.setInt("depthTex",  2);
+  ssgiShader.setInt("albedoTex", 3);
 
   while (!glfwWindowShouldClose(window)) {
     float currentFrame = glfwGetTime();
@@ -363,18 +465,6 @@ int main() {
         glm::lookAt(lightPos, glm::vec3(6.0f, 0.0f, 0.0f), glm::vec3(0.0, 1.0, 0.0));
     glm::mat4 lightSpaceMatrix = lightProjection * lightView;
 
-    simpleDepthShader.use();
-    simpleDepthShader.setMat4("lightSpaceMatrix", lightSpaceMatrix);
-
-    glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
-    glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
-    glClear(GL_DEPTH_BUFFER_BIT);
-    glCullFace(GL_FRONT); // Prevent peter-panning
-    // renderScene(simpleDepthShader, model1, model2, model3); //hard coded 3
-    // models, to fix this <-
-    // sceneRender.renderScene(simpleDepthShader, models); //hard coded 3
-    // models, to fix this <-
-
     //---------------------------3D OBJECTS
     //XFORMS------------------------------------------------ ground
     const glm::vec3 model1_position{0.0f, 0.0f, 0.0f};
@@ -389,19 +479,30 @@ int main() {
     const glm::vec3 model4_position{12.0f, 0.0f, 0.0f};
     const glm::vec3 model4_scale{1.0f};
 
-    //---------------------------RENDER SHADOW DEPTH
-    //PIPELINE--------------------------------------
+    //---------------------------PASS 1: SHADOW + RSM DEPTH
+    glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
+    glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
 
-    sceneRender.renderModel(simpleDepthShader, &model1, model1_position,
-                            model1_scale);
-    sceneRender.renderModel(simpleDepthShader, &model2, model2_position,
-                            model2_scale);
-    sceneRender.renderModel(simpleDepthShader, &model3, model3_position,
-                            model3_scale);
-    sceneRender.renderModel(simpleDepthShader, &model4, model4_position,
-                            model4_scale);
+    // Activate all 3 RSM color attachments so the clear covers them
+    unsigned int rsmDrawBufs[3] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2 };
+    glDrawBuffers(3, rsmDrawBufs);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    glCullFace(GL_BACK);
+    rsmDepthShader.use();
+    rsmDepthShader.setMat4("lightSpaceMatrix", lightSpaceMatrix);
+    rsmDepthShader.setVec3("lightColor", sunColor);
+
+    // Bind albedo per model; renderModel sets the "model" matrix uniform internally
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, albedo);
+    sceneRender.renderModel(rsmDepthShader, &model1, model1_position, model1_scale);
+    glBindTexture(GL_TEXTURE_2D, cup_albedo);
+    sceneRender.renderModel(rsmDepthShader, &model2, model2_position, model2_scale);
+    glBindTexture(GL_TEXTURE_2D, table_albedo);
+    sceneRender.renderModel(rsmDepthShader, &model3, model3_position, model3_scale);
+    glBindTexture(GL_TEXTURE_2D, rock_albedo);
+    sceneRender.renderModel(rsmDepthShader, &model4, model4_position, model4_scale);
+
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     glm::mat4 view = camera.GetViewMatrix();
@@ -411,9 +512,12 @@ int main() {
     glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
     glBindFramebuffer(GL_FRAMEBUFFER, sceneFBO);
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    // Activate all 3 attachments so the clear touches all of them
+    unsigned int allAttachments[3] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2 };
+    glDrawBuffers(3, allAttachments);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    // Skybox only writes to color attachment (no normals needed for sky)
+    // Skybox only writes to color attachment (no normals or albedo needed for sky)
     unsigned int skyAttachment = GL_COLOR_ATTACHMENT0;
     glDrawBuffers(1, &skyAttachment);
     glm::mat4 skyView = glm::mat4(glm::mat3(view));
@@ -422,9 +526,9 @@ int main() {
     skyboxShader.setMat4("view", skyView);
     renderSkybox(skyboxShader, envMap);
 
-    // PBR geometry writes to both color and normal attachments (MRT)
-    unsigned int bothAttachments[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
-    glDrawBuffers(2, bothAttachments);
+    // PBR geometry writes to color, normals, and albedo (MRT)
+    unsigned int geoAttachments[3] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2 };
+    glDrawBuffers(3, geoAttachments);
 
     pbrShader.use();
     pbrShader.setMat4("projection", projection);
@@ -448,14 +552,42 @@ int main() {
     sceneRender.processShaderPipeline(envMap, rock_albedo, rock_normal, rock_metallic, rock_roughness, rock_ao,
                                       depthMap, pbrShader, &model4, model4_position, model4_scale);
 
-    //---------------------------PASS 3: SSR COMPOSITE → default framebuffer
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    glClear(GL_COLOR_BUFFER_BIT);
     glDisable(GL_DEPTH_TEST);
+    glm::mat4 invProjection = glm::inverse(projection);
+    glm::mat4 invView       = glm::inverse(view);
 
-    ssrShader.use();
-    ssrShader.setMat4("projection",    projection);
-    ssrShader.setMat4("invProjection", glm::inverse(projection));
+    //---------------------------PASS 2.5: RSM INDIRECT → rsmIndirectFBO
+    glBindFramebuffer(GL_FRAMEBUFFER, rsmIndirectFBO);
+    glClear(GL_COLOR_BUFFER_BIT);
+
+    rsmIndirectShader.use();
+    rsmIndirectShader.setMat4("invProjection",    invProjection);
+    rsmIndirectShader.setMat4("invView",          invView);
+    rsmIndirectShader.setMat4("lightSpaceMatrix", lightSpaceMatrix);
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, sceneNormalTex);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, sceneDepthTex);
+    glActiveTexture(GL_TEXTURE2);
+    glBindTexture(GL_TEXTURE_2D, rsmPosTex);
+    glActiveTexture(GL_TEXTURE3);
+    glBindTexture(GL_TEXTURE_2D, rsmNormalTex);
+    glActiveTexture(GL_TEXTURE4);
+    glBindTexture(GL_TEXTURE_2D, rsmFluxTex);
+
+    glBindVertexArray(quadVAO);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+    glBindVertexArray(0);
+
+    //---------------------------PASS 2.6: SSGI → ssgiFBO
+    glBindFramebuffer(GL_FRAMEBUFFER, ssgiFBO);
+    glClear(GL_COLOR_BUFFER_BIT);
+
+    ssgiShader.use();
+    ssgiShader.setMat4("projection",    projection);
+    ssgiShader.setMat4("invProjection", invProjection);
+    ssgiShader.setFloat("time", (float)glfwGetTime());
 
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, sceneColorTex);
@@ -463,6 +595,31 @@ int main() {
     glBindTexture(GL_TEXTURE_2D, sceneNormalTex);
     glActiveTexture(GL_TEXTURE2);
     glBindTexture(GL_TEXTURE_2D, sceneDepthTex);
+    glActiveTexture(GL_TEXTURE3);
+    glBindTexture(GL_TEXTURE_2D, sceneAlbedoTex);
+
+    glBindVertexArray(quadVAO);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+    glBindVertexArray(0);
+
+    //---------------------------PASS 3: SSR + SSGI + RSM COMPOSITE → default framebuffer
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glClear(GL_COLOR_BUFFER_BIT);
+
+    ssrShader.use();
+    ssrShader.setMat4("projection",    projection);
+    ssrShader.setMat4("invProjection", invProjection);
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, sceneColorTex);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, sceneNormalTex);
+    glActiveTexture(GL_TEXTURE2);
+    glBindTexture(GL_TEXTURE_2D, sceneDepthTex);
+    glActiveTexture(GL_TEXTURE3);
+    glBindTexture(GL_TEXTURE_2D, ssgiColorTex);
+    glActiveTexture(GL_TEXTURE4);
+    glBindTexture(GL_TEXTURE_2D, rsmIndirectTex);
 
     glBindVertexArray(quadVAO);
     glDrawArrays(GL_TRIANGLES, 0, 6);
