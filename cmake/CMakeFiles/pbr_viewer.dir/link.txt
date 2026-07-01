@@ -1,0 +1,1 @@
+/usr/bin/c++  -arch arm64 -Wl,-search_paths_first -Wl,-headerpad_max_install_names CMakeFiles/pbr_viewer.dir/main.cpp.o CMakeFiles/pbr_viewer.dir/glad/src/glad.c.o -o pbr_viewer  /usr/local/lib/libglfw3.a -framework OpenGL libglad.a /usr/local/lib/libglm.a -ldl -lpthread -framework Cocoa -framework IOKit -framework QuartzCore -framework CoreFoundation
