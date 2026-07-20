@@ -287,8 +287,6 @@ int main() {
   Shader ssgiShader("shaders/ssr.vs", "shaders/ssgi.fs");
 
   // Scene objects: each AddEntity call loads the OBJ, loads its PBR texture
-  // set by folder convention, and places it with a Transform. Adding a new
-  // model to the scene is just one more call here.
   Scene scene;
   scene.AddEntity("ground", "models/plane/simple_plane.obj", "models/plane",
                    Transform{glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f), glm::vec3(0.8f)});
@@ -298,6 +296,12 @@ int main() {
                    Transform{glm::vec3(1.0f, 1.0f, 0.0f), glm::vec3(0.0f), glm::vec3(0.02f)});
   scene.AddEntity("rock", "models/coast_rock/coast_rock.obj", "models/coast_rock",
                    Transform{glm::vec3(12.0f, 0.0f, 0.0f), glm::vec3(0.0f), glm::vec3(1.0f)});
+  scene.AddEntityLOD("trench_rock",
+                      {"models/ground_trench_rock01/trench_rock01.obj",
+                       "models/ground_trench_rock01/trench_rock01_LOD1.obj",
+                       "models/ground_trench_rock01/trench_rock01_LOD2.obj"},
+                      {20.0f, 45.0f}, "models/ground_trench_rock01",
+                      Transform{glm::vec3(1.5f, 0.0f, 0.0f), glm::vec3(0.0f), glm::vec3(10.0f)});
 
   /////////env map///////
   Shader skyboxShader("shaders/skybox.vs", "shaders/skybox.fs");
@@ -423,6 +427,10 @@ int main() {
 
     processInput(window);
     camera.UpdateBob(deltaTime, isMoving, isRunning, isOnGround && !flyMode);
+
+    // Pick each LOD entity's active mesh based on distance to the camera
+    // before either render pass draws it this frame.
+    scene.UpdateLOD(camera.Position);
 
     // Shadow setup
     //  Render depth of scene to texture (from light's perspective)
