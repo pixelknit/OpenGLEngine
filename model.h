@@ -6,12 +6,6 @@
 #include <glm/gtc/matrix_transform.hpp>
 #define TINYOBJLOADER_IMPLEMENTATION
 #include "tiny_obj_loader.h"
-#include "stb_image.h"
-
-#ifndef GL_TEXTURE_MAX_ANISOTROPY_EXT
-#define GL_TEXTURE_MAX_ANISOTROPY_EXT     0x84FE
-#define GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT 0x84FF
-#endif
 
 #include <string>
 #include <fstream>
@@ -24,8 +18,6 @@
 #include "shader.h"
 
 using namespace std;
-
-unsigned int TextureFromFile(const char *path, const string &directory, bool gamma = false);
 
 class Model {
 private:

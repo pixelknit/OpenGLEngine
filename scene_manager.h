@@ -1,105 +1,77 @@
 #ifndef SCENE_H
 #define SCENE_H
 
-
-#include "shader.h" 
+#include "entity.h"
+#include "material.h"
 #include "model.h"
+#include "shader.h"
+#include "transform.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/type_ptr.hpp>
+#include <memory>
+#include <string>
+#include <vector>
 
-class SceneUtils{
+// Owns every model + entity in the scene and knows how to render them.
+// Add an object with one call:
+//
+//   scene.AddEntity("table", "models/table/table.obj", "models/table",
+//                    Transform{ {1.0f, 1.0f, 0.0f}, {}, glm::vec3(0.02f) });
+//
+// and it participates in both the shadow/RSM depth pass and the main PBR
+// pass automatically.
+class Scene {
+public:
+    std::vector<Entity> entities;
 
-  public:
-  SceneUtils()
-  {
+    Entity &AddEntity(const std::string &name, const std::string &objPath,
+                       const std::string &textureFolder, const Transform &transform) {
+        models.push_back(std::make_unique<Model>(name, objPath));
+        Entity entity;
+        entity.model = models.back().get();
+        entity.material = Material::LoadPBR(textureFolder);
+        entity.transform = transform;
+        entities.push_back(entity);
+        return entities.back();
+    }
 
-  }
+    // Depth-only pass (shadow map / RSM). Only the albedo map is bound since
+    // that's all rsmDepthShader samples.
+    void RenderShadowPass(Shader &shader) {
+        for (Entity &entity : entities) {
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, entity.material.albedo);
+            shader.setMat4("model", entity.transform.GetMatrix());
+            entity.model->Draw(shader);
+        }
+    }
 
-  //hard coded first test render scene method
-  void renderScene_test(Shader &shader, Model &model1, Model &model2, Model &model3) {
-      // Object 1
-      glm::mat4 model = glm::mat4(1.0f);
-      model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
-      model = glm::scale(model, glm::vec3(0.5f));
-      shader.setMat4("model", model);
-      model1.Draw(shader);
-      
-      // Object 2
-      model = glm::mat4(1.0f);
-      model = glm::translate(model, glm::vec3(3.0f, -1.0f, 1.0f));
-      model = glm::scale(model, glm::vec3(0.4f));
-      model = glm::rotate(model, glm::radians(45.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-      shader.setMat4("model", model);
-      model2.Draw(shader);
-      
-      // Object 3 
-      model = glm::mat4(1.0f);
-      model = glm::translate(model, glm::vec3(-3.0f, 1.5f, -1.0f));
-      model = glm::scale(model, glm::vec3(0.6f));
-      shader.setMat4("model", model);
-      model3.Draw(shader);
-  }
+    // Full PBR pass: binds all five material maps plus the shared shadow map
+    // and environment map, then draws.
+    void RenderPBRPass(Shader &shader, unsigned int envMap, unsigned int depthMap) {
+        for (Entity &entity : entities) {
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, entity.material.albedo);
+            glActiveTexture(GL_TEXTURE1);
+            glBindTexture(GL_TEXTURE_2D, entity.material.normal);
+            glActiveTexture(GL_TEXTURE2);
+            glBindTexture(GL_TEXTURE_2D, entity.material.metallic);
+            glActiveTexture(GL_TEXTURE3);
+            glBindTexture(GL_TEXTURE_2D, entity.material.roughness);
+            glActiveTexture(GL_TEXTURE4);
+            glBindTexture(GL_TEXTURE_2D, entity.material.ao);
+            glActiveTexture(GL_TEXTURE5);
+            glBindTexture(GL_TEXTURE_2D, depthMap);
+            glActiveTexture(GL_TEXTURE6);
+            glBindTexture(GL_TEXTURE_2D, envMap);
 
+            shader.setMat4("model", entity.transform.GetMatrix());
+            entity.model->Draw(shader);
+        }
+    }
 
-  void renderScene(Shader &shader, vector<Model*> &models)
-  {
-      int i {0};
-      for (Model* model_it: models ){
-        glm::mat4 model = glm::mat4(1.0f);
-        model = glm::translate(model, glm::vec3(0.0f + i, 0.0f + i, 0.0f));
-        model = glm::scale(model, glm::vec3(0.5f));
-        shader.setMat4("model", model);
-        model_it->Draw(shader);
-        ++i;
-      }
-
-  }
-
-  void renderModel(Shader &shader, Model* Model, glm::vec3 position, glm::vec3 scale)
-  {
-        glm::mat4 model = glm::mat4(1.0f);
-        model = glm::translate(model, position);
-        model = glm::scale(model, scale);
-        shader.setMat4("model", model);
-        Model->Draw(shader);
-
-  }
-
-  void processShaderPipeline(
-      unsigned int &envMap,
-      unsigned int &albedo,
-      unsigned int &normal,
-      unsigned int &metallic,
-      unsigned int &roughness,
-      unsigned int &ao,
-      unsigned int &depthMap,
-      Shader &pbrShader,
-      Model* model,
-      glm::vec3 model_position,
-      glm::vec3 model_scale
-      )
-  {
-
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, albedo);
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, normal);
-    glActiveTexture(GL_TEXTURE2);
-    glBindTexture(GL_TEXTURE_2D, metallic);
-    glActiveTexture(GL_TEXTURE3);
-    glBindTexture(GL_TEXTURE_2D, roughness);
-    glActiveTexture(GL_TEXTURE4);
-    glBindTexture(GL_TEXTURE_2D, ao);
-    glActiveTexture(GL_TEXTURE5);
-    glBindTexture(GL_TEXTURE_2D, depthMap);
-    glActiveTexture(GL_TEXTURE6);
-    glBindTexture(GL_TEXTURE_2D, envMap);
-
-    renderModel(pbrShader, model, model_position, model_scale);
-    
-  }
-
+private:
+    std::vector<std::unique_ptr<Model>> models;
 };
 
 #endif

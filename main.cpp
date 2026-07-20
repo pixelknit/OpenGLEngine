@@ -1,5 +1,4 @@
 #include "camera.h"
-#include "model.h"
 #include "scene_manager.h"
 #include "shader.h"
 #include "test_callback.h"
@@ -14,16 +13,10 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
-#ifndef GL_TEXTURE_MAX_ANISOTROPY_EXT
-#define GL_TEXTURE_MAX_ANISOTROPY_EXT     0x84FE
-#define GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT 0x84FF
-#endif
-
 void framebuffer_size_callback(GLFWwindow *window, int width, int height);
 void mouse_callback(GLFWwindow *window, double xpos, double ypos);
 void scroll_callback(GLFWwindow *window, double xoffset, double yoffset);
 void processInput(GLFWwindow *window);
-unsigned int loadTexture(const char *path);
 
 const unsigned int SCR_WIDTH = 1920;
 const unsigned int SCR_HEIGHT = 1080;
@@ -83,9 +76,6 @@ float quadVertices[] = {
      1.0f, -1.0f,  1.0f, 0.0f,
      1.0f,  1.0f,  1.0f, 1.0f
 };
-
-// Helper function to render scene
-SceneUtils sceneRender = SceneUtils();
 
 unsigned int loadEquirectangularMap(const char* path) {
     unsigned int textureID;
@@ -296,11 +286,18 @@ int main() {
   Shader ssrShader("shaders/ssr.vs", "shaders/ssr.fs");
   Shader ssgiShader("shaders/ssr.vs", "shaders/ssgi.fs");
 
-  // Load multiple models (can be same file or different)
-  Model model1("ground", "models/plane/simple_plane.obj");
-  Model model2("cup", "models/cup/cup.obj");
-  Model model3("table", "models/table/table.obj");
-  Model model4("rock", "models/coast_rock/coast_rock.obj");
+  // Scene objects: each AddEntity call loads the OBJ, loads its PBR texture
+  // set by folder convention, and places it with a Transform. Adding a new
+  // model to the scene is just one more call here.
+  Scene scene;
+  scene.AddEntity("ground", "models/plane/simple_plane.obj", "models/plane",
+                   Transform{glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f), glm::vec3(0.8f)});
+  scene.AddEntity("cup", "models/cup/cup.obj", "models/cup",
+                   Transform{glm::vec3(1.0f, 2.05f, 0.0f), glm::vec3(0.0f), glm::vec3(0.5f)});
+  scene.AddEntity("table", "models/table/table.obj", "models/table",
+                   Transform{glm::vec3(1.0f, 1.0f, 0.0f), glm::vec3(0.0f), glm::vec3(0.02f)});
+  scene.AddEntity("rock", "models/coast_rock/coast_rock.obj", "models/coast_rock",
+                   Transform{glm::vec3(12.0f, 0.0f, 0.0f), glm::vec3(0.0f), glm::vec3(1.0f)});
 
   /////////env map///////
   Shader skyboxShader("shaders/skybox.vs", "shaders/skybox.fs");
@@ -310,35 +307,8 @@ int main() {
   initRSMIndirectFBO();
   initSSGIFBO();
 
-  // Load environment map 
+  // Load environment map
   unsigned int envMap = loadEquirectangularMap("models/env_map.hdr");
-
-  // vector<Model*> models {&model1, &model2, &model3};
-
-  // Load textures
-  unsigned int albedo = loadTexture("models/plane/albedo.png");
-  unsigned int normal = loadTexture("models/plane/normal.png");
-  unsigned int metallic = loadTexture("models/plane/metallic.png");
-  unsigned int roughness = loadTexture("models/plane/roughness.png");
-  unsigned int ao = loadTexture("models/plane/ao.png");
-
-  unsigned int cup_albedo = loadTexture("models/cup/albedo.png");
-  unsigned int cup_normal = loadTexture("models/cup/normal.png");
-  unsigned int cup_metallic = loadTexture("models/cup/metallic.png");
-  unsigned int cup_roughness = loadTexture("models/cup/roughness.png");
-  unsigned int cup_ao = loadTexture("models/cup/ao.png");
-
-  unsigned int table_albedo = loadTexture("models/table/albedo.png");
-  unsigned int table_normal = loadTexture("models/table/normal.png");
-  unsigned int table_metallic = loadTexture("models/table/metallic.png");
-  unsigned int table_roughness = loadTexture("models/table/roughness.png");
-  unsigned int table_ao = loadTexture("models/table/ao.png");
-
-  unsigned int rock_albedo = loadTexture("models/coast_rock/albedo.png");
-  unsigned int rock_normal = loadTexture("models/coast_rock/normal.png");
-  unsigned int rock_metallic = loadTexture("models/coast_rock/metallic.png");
-  unsigned int rock_roughness = loadTexture("models/coast_rock/roughness.png");
-  unsigned int rock_ao = loadTexture("models/coast_rock/ao.png");
 
   // Configure depth map FBO
   glGenFramebuffers(1, &depthMapFBO);
@@ -465,20 +435,6 @@ int main() {
         glm::lookAt(lightPos, glm::vec3(6.0f, 0.0f, 0.0f), glm::vec3(0.0, 1.0, 0.0));
     glm::mat4 lightSpaceMatrix = lightProjection * lightView;
 
-    //---------------------------3D OBJECTS
-    //XFORMS------------------------------------------------ ground
-    const glm::vec3 model1_position{0.0f, 0.0f, 0.0f};
-    const glm::vec3 model1_scale{0.8f};
-    // cup
-    const glm::vec3 model2_position{1.0f, 2.05f, 0.0f};
-    const glm::vec3 model2_scale{0.5f};
-    // table
-    const glm::vec3 model3_position{1.0f, 1.0f, 0.0f};
-    const glm::vec3 model3_scale{0.02f};
-    // rock
-    const glm::vec3 model4_position{12.0f, 0.0f, 0.0f};
-    const glm::vec3 model4_scale{1.0f};
-
     //---------------------------PASS 1: SHADOW + RSM DEPTH
     glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
     glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
@@ -492,16 +448,7 @@ int main() {
     rsmDepthShader.setMat4("lightSpaceMatrix", lightSpaceMatrix);
     rsmDepthShader.setVec3("lightColor", sunColor);
 
-    // Bind albedo per model; renderModel sets the "model" matrix uniform internally
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, albedo);
-    sceneRender.renderModel(rsmDepthShader, &model1, model1_position, model1_scale);
-    glBindTexture(GL_TEXTURE_2D, cup_albedo);
-    sceneRender.renderModel(rsmDepthShader, &model2, model2_position, model2_scale);
-    glBindTexture(GL_TEXTURE_2D, table_albedo);
-    sceneRender.renderModel(rsmDepthShader, &model3, model3_position, model3_scale);
-    glBindTexture(GL_TEXTURE_2D, rock_albedo);
-    sceneRender.renderModel(rsmDepthShader, &model4, model4_position, model4_scale);
+    scene.RenderShadowPass(rsmDepthShader);
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
@@ -543,14 +490,7 @@ int main() {
       pbrShader.setVec3("lightColors["    + std::to_string(i) + "]", lightColors[i]);
     }
 
-    sceneRender.processShaderPipeline(envMap, albedo, normal, metallic, roughness, ao,
-                                      depthMap, pbrShader, &model1, model1_position, model1_scale);
-    sceneRender.processShaderPipeline(envMap, cup_albedo, cup_normal, cup_metallic, cup_roughness, cup_ao,
-                                      depthMap, pbrShader, &model2, model2_position, model2_scale);
-    sceneRender.processShaderPipeline(envMap, table_albedo, table_normal, table_metallic, table_roughness, table_ao,
-                                      depthMap, pbrShader, &model3, model3_position, model3_scale);
-    sceneRender.processShaderPipeline(envMap, rock_albedo, rock_normal, rock_metallic, rock_roughness, rock_ao,
-                                      depthMap, pbrShader, &model4, model4_position, model4_scale);
+    scene.RenderPBRPass(pbrShader, envMap, depthMap);
 
     glDisable(GL_DEPTH_TEST);
     glm::mat4 invProjection = glm::inverse(projection);
@@ -707,41 +647,3 @@ void scroll_callback(GLFWwindow *window, double xoffset, double yoffset) {
   camera.ProcessMouseScroll(yoffset);
 }
 
-unsigned int loadTexture(const char *path) {
-  unsigned int textureID;
-  glGenTextures(1, &textureID);
-
-  int width, height, nrComponents;
-  unsigned char *data = stbi_load(path, &width, &height, &nrComponents, 0);
-  if (data) {
-    GLenum format;
-    if (nrComponents == 1)
-      format = GL_RED;
-    else if (nrComponents == 3)
-      format = GL_RGB;
-    else if (nrComponents == 4)
-      format = GL_RGBA;
-
-    glBindTexture(GL_TEXTURE_2D, textureID);
-    glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format,
-                 GL_UNSIGNED_BYTE, data);
-    glGenerateMipmap(GL_TEXTURE_2D);
-
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
-                    GL_LINEAR_MIPMAP_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-    float maxAniso;
-    glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &maxAniso);
-    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, maxAniso);
-
-    stbi_image_free(data);
-  } else {
-    std::cout << "Texture failed to load at path: " << path << std::endl;
-    stbi_image_free(data);
-  }
-
-  return textureID;
-}
