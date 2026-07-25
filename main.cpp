@@ -294,14 +294,19 @@ int main() {
                    Transform{glm::vec3(1.0f, 2.05f, 0.0f), glm::vec3(0.0f), glm::vec3(0.5f)});
   scene.AddEntity("table", "models/table/table.obj", "models/table",
                    Transform{glm::vec3(1.0f, 1.0f, 0.0f), glm::vec3(0.0f), glm::vec3(0.02f)});
-  scene.AddEntity("rock", "models/coast_rock/coast_rock.obj", "models/coast_rock",
+  scene.AddEntityLOD("rock", 
+                  {"models/coast_rock/coast_rock.obj",
+                  "models/coast_rock/coast_rock_LOD1.obj",
+                  "models/coast_rock/coast_rock_LOD2.obj"}, 
+                  {20.0f, 45.0f} ,"models/coast_rock",
                    Transform{glm::vec3(12.0f, 0.0f, 0.0f), glm::vec3(0.0f), glm::vec3(1.0f)});
-  scene.AddEntityLOD("trench_rock",
+  scene.AddScatteredEntityLOD("trench_rock",
                       {"models/ground_trench_rock01/trench_rock01.obj",
                        "models/ground_trench_rock01/trench_rock01_LOD1.obj",
                        "models/ground_trench_rock01/trench_rock01_LOD2.obj"},
                       {20.0f, 45.0f}, "models/ground_trench_rock01",
-                      Transform{glm::vec3(1.5f, 0.0f, 0.0f), glm::vec3(0.0f), glm::vec3(10.0f)});
+                      /*count*/ 40, /*center*/ glm::vec3(1.5f, 0.0f, 0.0f), /*radius*/ 12.0f,
+                      /*scaleRange*/ glm::vec2(6.0f, 14.0f));
 
   /////////env map///////
   Shader skyboxShader("shaders/skybox.vs", "shaders/skybox.fs");

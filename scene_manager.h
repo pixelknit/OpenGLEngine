@@ -7,8 +7,11 @@
 #include "shader.h"
 #include "transform.h"
 #include <glm/glm.hpp>
+#include <glm/gtc/constants.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <cmath>
 #include <memory>
+#include <random>
 #include <string>
 #include <vector>
 
@@ -65,6 +68,66 @@ public:
         return entities.back();
     }
 
+    // Scatters `count` copies of a LOD model chain randomly within `radius`
+    // of `center` (uniform over the disc, so density doesn't bunch up at the
+    // middle), with a random Y rotation and a random uniform scale drawn from
+    // [scaleRange.x, scaleRange.y]. All instances share one Entity and are
+    // drawn with a single instanced draw call per submesh per LOD level, so
+    // this is far cheaper than `count` separate AddEntityLOD calls. LOD level
+    // is chosen once per frame from the camera's distance to `center`, so the
+    // whole cluster switches detail together.
+    //
+    //   scene.AddScatteredEntityLOD("trench_rock",
+    //       {"models/ground_trench_rock01/trench_rock01.obj",
+    //        "models/ground_trench_rock01/trench_rock01_LOD1.obj",
+    //        "models/ground_trench_rock01/trench_rock01_LOD2.obj"},
+    //       {20.0f, 45.0f},
+    //       "models/ground_trench_rock01",
+    //       /*count*/ 40, /*center*/ glm::vec3(1.5f, 0.0f, 0.0f), /*radius*/ 12.0f,
+    //       /*scaleRange*/ glm::vec2(0.6f, 1.4f));
+    Entity &AddScatteredEntityLOD(const std::string &name, const std::vector<std::string> &objPaths,
+                                   const std::vector<float> &lodDistances, const std::string &textureFolder,
+                                   unsigned int count, const glm::vec3 &center, float radius,
+                                   const glm::vec2 &scaleRange, unsigned int seed = 1337) {
+        Entity entity;
+        for (size_t i = 0; i < objPaths.size(); ++i) {
+            models.push_back(std::make_unique<Model>(name + "_LOD" + std::to_string(i), objPaths[i]));
+            entity.lodModels.push_back(models.back().get());
+        }
+        entity.lodDistances = lodDistances;
+        entity.model = entity.lodModels.front();
+        entity.material = Material::LoadPBR(textureFolder);
+        // UpdateLOD() picks the cluster's detail level off transform.position,
+        // so anchor it at the scatter center.
+        entity.transform.position = center;
+
+        std::mt19937 rng(seed);
+        std::uniform_real_distribution<float> unit(0.0f, 1.0f);
+        std::uniform_real_distribution<float> angleDist(0.0f, glm::two_pi<float>());
+        std::uniform_real_distribution<float> scaleDist(scaleRange.x, scaleRange.y);
+
+        entity.instanceTransforms.reserve(count);
+        for (unsigned int i = 0; i < count; ++i) {
+            // sqrt(unit) keeps points uniformly dense across the disc instead
+            // of clustering near the center.
+            float r = radius * std::sqrt(unit(rng));
+            float angle = angleDist(rng);
+            glm::vec3 position = center + glm::vec3(r * std::cos(angle), 0.0f, r * std::sin(angle));
+
+            Transform t;
+            t.position = position;
+            t.rotation = glm::vec3(0.0f, glm::degrees(angleDist(rng)), 0.0f);
+            t.scale = glm::vec3(scaleDist(rng));
+            entity.instanceTransforms.push_back(t.GetMatrix());
+        }
+
+        for (Model *lodModel : entity.lodModels)
+            lodModel->SetupInstancing(entity.instanceTransforms);
+
+        entities.push_back(entity);
+        return entities.back();
+    }
+
     // Call once per frame (before the render passes) to pick each LOD
     // entity's active model based on distance from the camera. Entities
     // added via plain AddEntity have no lodModels and are skipped.
@@ -87,8 +150,15 @@ public:
         for (Entity &entity : entities) {
             glActiveTexture(GL_TEXTURE0);
             glBindTexture(GL_TEXTURE_2D, entity.material.albedo);
-            shader.setMat4("model", entity.transform.GetMatrix());
-            entity.model->Draw(shader);
+
+            if (entity.IsInstanced()) {
+                shader.setBool("instanced", true);
+                entity.model->DrawInstanced(shader);
+            } else {
+                shader.setBool("instanced", false);
+                shader.setMat4("model", entity.transform.GetMatrix());
+                entity.model->Draw(shader);
+            }
         }
     }
 
@@ -111,8 +181,14 @@ public:
             glActiveTexture(GL_TEXTURE6);
             glBindTexture(GL_TEXTURE_2D, envMap);
 
-            shader.setMat4("model", entity.transform.GetMatrix());
-            entity.model->Draw(shader);
+            if (entity.IsInstanced()) {
+                shader.setBool("instanced", true);
+                entity.model->DrawInstanced(shader);
+            } else {
+                shader.setBool("instanced", false);
+                shader.setMat4("model", entity.transform.GetMatrix());
+                entity.model->Draw(shader);
+            }
         }
     }
 

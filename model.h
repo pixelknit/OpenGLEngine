@@ -37,6 +37,18 @@ public:
             meshes[i].Draw(shader);
     }
 
+    // Uploads the same set of per-instance model matrices to every submesh
+    // so a scattered cluster of this model can be drawn in one call per submesh.
+    void SetupInstancing(const vector<glm::mat4> &instanceMatrices) {
+        for(unsigned int i = 0; i < meshes.size(); i++)
+            meshes[i].SetupInstancing(instanceMatrices);
+    }
+
+    void DrawInstanced(Shader &shader) {
+        for(unsigned int i = 0; i < meshes.size(); i++)
+            meshes[i].DrawInstanced(shader);
+    }
+
 private:
     void loadModel(string const &path) {
         tinyobj::attrib_t attrib;

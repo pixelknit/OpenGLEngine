@@ -18,6 +18,13 @@ struct Entity {
     // to lodModels[i + 1], so lodDistances.size() == lodModels.size() - 1.
     std::vector<Model *> lodModels;
     std::vector<float> lodDistances;
+
+    // Per-instance model matrices for GPU-instanced rendering (e.g. a
+    // scattered cluster of rocks drawn in one call). Empty for regular
+    // entities, which use transform.GetMatrix() instead.
+    std::vector<glm::mat4> instanceTransforms;
+
+    bool IsInstanced() const { return !instanceTransforms.empty(); }
 };
 
 #endif

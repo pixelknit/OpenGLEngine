@@ -4,6 +4,7 @@ layout (location = 1) in vec3 aNormal;
 layout (location = 2) in vec2 aTexCoords;
 layout (location = 3) in vec3 aTangent;
 layout (location = 4) in vec3 aBitangent;
+layout (location = 5) in mat4 aInstanceModel; // consumes locations 5-8
 
 out vec2 TexCoords;
 out vec3 WorldPos;
@@ -14,15 +15,18 @@ out vec4 FragPosLightSpace;
 uniform mat4 projection;
 uniform mat4 view;
 uniform mat4 model;
-uniform mat4 lightSpaceMatrix; 
+uniform mat4 lightSpaceMatrix;
+uniform bool instanced;
 
 void main() {
+    mat4 modelMatrix = instanced ? aInstanceModel : model;
+
     //TexCoords = vec2(aTexCoords.x, 1.0 - aTexCoords.y);
     TexCoords = aTexCoords;
-    WorldPos = vec3(model * vec4(aPos, 1.0));
+    WorldPos = vec3(modelMatrix * vec4(aPos, 1.0));
     FragPosLightSpace = lightSpaceMatrix * vec4(WorldPos, 1.0);
     
-    mat3 normalMatrix = transpose(inverse(mat3(model)));
+    mat3 normalMatrix = transpose(inverse(mat3(modelMatrix)));
     vec3 N = normalize(normalMatrix * aNormal);
 
     // Gram-Schmidt: re-derive T perpendicular to N, fall back if T is NaN/degenerate
