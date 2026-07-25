@@ -2,12 +2,15 @@
 #include "scene_manager.h"
 #include "shader.h"
 #include "test_callback.h"
+#include "ui.h"
 #include <GLFW/glfw3.h>
 #include <glad/glad.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <iostream>
+#include <string>
+#include <unordered_map>
 // #include <vector>
 
 #define STB_IMAGE_IMPLEMENTATION
@@ -32,6 +35,10 @@ float lastFrame = 0.0f;
 // Walk / fly toggle
 bool flyMode = false;
 bool qPreviouslyPressed = false;
+
+// Editor mode: cursor released, camera frozen, panels clickable (Tab toggles)
+bool uiMode = false;
+bool tabPreviouslyPressed = false;
 
 // Run state (updated each frame by processInput, consumed by UpdateBob)
 bool isMoving = false;
@@ -100,6 +107,20 @@ unsigned int loadEquirectangularMap(const char* path) {
         stbi_image_free(data);
     }
     return textureID;
+}
+
+// HDRIs stay resident once loaded, so switching back to one already picked in
+// the editor dropdown doesn't re-decode the file off disk.
+std::unordered_map<std::string, unsigned int> envMapCache;
+
+unsigned int getEnvMap(const std::string &path) {
+    auto it = envMapCache.find(path);
+    if (it != envMapCache.end())
+        return it->second;
+
+    unsigned int id = loadEquirectangularMap(path.c_str());
+    envMapCache[path] = id;
+    return id;
 }
 
 // Helper to render a skybox
@@ -275,6 +296,10 @@ int main() {
     return -1;
   }
 
+  // After our own GLFW callbacks are installed: the ImGui backend chains onto
+  // them rather than replacing them.
+  EditorUI::Init(window);
+
   glEnable(GL_DEPTH_TEST);
   // glEnable(GL_CULL_FACE);
 
@@ -316,8 +341,20 @@ int main() {
   initRSMIndirectFBO();
   initSSGIFBO();
 
-  // Load environment map
-  unsigned int envMap = loadEquirectangularMap("models/env_map.hdr");
+  // Editor state — every panel value lives here; the render loop reads it back
+  // when filling in uniforms.
+  EditorState editor;
+  editor.hdriPaths = EditorUI::ScanHDRIs("models");
+  for (size_t i = 0; i < editor.hdriPaths.size(); ++i)
+    if (editor.hdriPaths[i] == "models/env_map.hdr")
+      editor.hdriIndex = (int)i;
+
+  // Load environment map. If the scan turned up nothing (assets moved?), fall
+  // back to the original hardcoded path so the skybox still has something.
+  unsigned int envMap = editor.hdriPaths.empty()
+                            ? loadEquirectangularMap("models/env_map.hdr")
+                            : getEnvMap(editor.hdriPaths[editor.hdriIndex]);
+  int loadedHdriIndex = editor.hdriIndex;
 
   // Configure depth map FBO
   glGenFramebuffers(1, &depthMapFBO);
@@ -360,11 +397,10 @@ int main() {
   glReadBuffer(GL_NONE);
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-  // Directional sun light — lightPos only used for shadow lookAt, not for shading
-  const float sunLightValue = 5.0f;
-  glm::vec3 lightPos(-10.0f, 30.0f, -10.0f);
-  glm::vec3 sunDir = glm::normalize(lightPos); // direction from world toward sun
-  glm::vec3 sunColor = glm::vec3(sunLightValue);
+  // Directional sun light. Direction, intensity and tint are driven by the
+  // editor's Sun panel and recomputed each frame; the shadow camera looks at
+  // shadowTarget from whichever direction the sun currently points.
+  const glm::vec3 shadowTarget(6.0f, 0.0f, 0.0f);
 
   // Remaining point lights
   glm::vec3 lightColors[] = {glm::vec3(100.0f, 100.0f, 100.0f),
@@ -382,9 +418,8 @@ int main() {
   pbrShader.setInt("aoMap", 4);
   pbrShader.setInt("shadowMap", 5); // Shadow map in here :)
   pbrShader.setInt("envMap", 6);
-  pbrShader.setFloat("envMapIntensity", 1.0f);
-  pbrShader.setFloat("minRoughness",    0.35f); // prevents mirror-smooth surfaces
-  pbrShader.setFloat("metallicMult",    0.5f);  // table textures run ~0.81 mean; pull back
+  // envMapIntensity / minRoughness / metallicMult are set per frame from the
+  // editor's Rendering panel.
 
   skyboxShader.use();
   skyboxShader.setInt("envMap", 0);
@@ -417,6 +452,10 @@ int main() {
     deltaTime = currentFrame - lastFrame;
     lastFrame = currentFrame;
 
+    // Opened first so processInput can ask ImGui whether it owns the keyboard
+    // this frame before acting on any key.
+    EditorUI::BeginFrame();
+
     // Walk-mode gravity
     if (!flyMode) {
       verticalVelocity += GRAVITY * deltaTime;
@@ -433,19 +472,35 @@ int main() {
     processInput(window);
     camera.UpdateBob(deltaTime, isMoving, isRunning, isOnGround && !flyMode);
 
+    // Build this frame's panels. Everything below reads the values back out,
+    // so edits land on the same frame they're made.
+    EditorUI::Draw(editor, scene, camera, deltaTime, uiMode);
+
+    // Swap the environment map if the dropdown moved.
+    if (!editor.hdriPaths.empty() && editor.hdriIndex != loadedHdriIndex) {
+      envMap = getEnvMap(editor.hdriPaths[editor.hdriIndex]);
+      loadedHdriIndex = editor.hdriIndex;
+    }
+
     // Pick each LOD entity's active mesh based on distance to the camera
     // before either render pass draws it this frame.
     scene.UpdateLOD(camera.Position);
 
+    glm::vec3 sunDir = editor.SunDirection(); // direction from world toward sun
+    glm::vec3 sunColor = editor.SunRadiance();
+    glm::vec3 lightPos = editor.ShadowCameraPos(shadowTarget);
+
     // Shadow setup
     //  Render depth of scene to texture (from light's perspective)
-    // Ortho bounds must enclose the entire scene; rock is at x=12 so use ±35.
-    // Far plane extended to 100 so nothing gets clipped along the light ray.
+    // The ortho box has to enclose everything that should cast; its half-width
+    // and the light's distance are both editor-driven, so derive the far plane
+    // from them instead of hardcoding it.
+    float ext = editor.shadowExtent;
     glm::mat4 lightProjection =
-        glm::ortho(-35.0f, 35.0f, -35.0f, 35.0f, 0.1f, 100.0f);
-    // Look toward scene center (~6,0,0) so the frustum is centered on content.
+        glm::ortho(-ext, ext, -ext, ext, 0.1f, editor.sunDistance + ext * 2.0f);
+    // Look toward scene center so the frustum is centered on content.
     glm::mat4 lightView =
-        glm::lookAt(lightPos, glm::vec3(6.0f, 0.0f, 0.0f), glm::vec3(0.0, 1.0, 0.0));
+        glm::lookAt(lightPos, shadowTarget, glm::vec3(0.0, 1.0, 0.0));
     glm::mat4 lightSpaceMatrix = lightProjection * lightView;
 
     //---------------------------PASS 1: SHADOW + RSM DEPTH
@@ -498,6 +553,9 @@ int main() {
 
     pbrShader.setVec3("sunDirection", sunDir);
     pbrShader.setVec3("sunColor", sunColor);
+    pbrShader.setFloat("envMapIntensity", editor.envMapIntensity);
+    pbrShader.setFloat("minRoughness", editor.minRoughness);
+    pbrShader.setFloat("metallicMult", editor.metallicMult);
     for (unsigned int i = 0; i < 2; ++i) {
       pbrShader.setVec3("lightPositions[" + std::to_string(i) + "]", lightPositions[i]);
       pbrShader.setVec3("lightColors["    + std::to_string(i) + "]", lightColors[i]);
@@ -580,10 +638,14 @@ int main() {
 
     glEnable(GL_DEPTH_TEST);
 
+    // Editor panels go last so they sit on top of the composited frame.
+    EditorUI::EndFrame();
+
     glfwSwapBuffers(window);
     glfwPollEvents();
   }
 
+  EditorUI::Shutdown();
   glfwTerminate();
   return 0;
 }
@@ -591,6 +653,27 @@ int main() {
 void processInput(GLFWwindow *window) {
   if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
     glfwSetWindowShouldClose(window, true);
+
+  // Tab hands the cursor to the editor panels and back. ImGui gets first
+  // refusal so Tab still walks between fields while one is being typed into.
+  bool tabPressed = !EditorUI::WantsKeyboard() &&
+                    glfwGetKey(window, GLFW_KEY_TAB) == GLFW_PRESS;
+  if (tabPressed && !tabPreviouslyPressed) {
+    uiMode = !uiMode;
+    glfwSetInputMode(window, GLFW_CURSOR,
+                     uiMode ? GLFW_CURSOR_NORMAL : GLFW_CURSOR_DISABLED);
+    // The cursor moved freely while the UI had it; don't feed that travel to
+    // the camera as one huge delta when it gets recaptured.
+    firstMouse = true;
+  }
+  tabPreviouslyPressed = tabPressed;
+
+  // While the UI owns the cursor the camera takes no input at all.
+  if (uiMode) {
+    isMoving = false;
+    isRunning = false;
+    return;
+  }
 
   // Toggle fly / walk mode
   bool qPressed = glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS;
@@ -641,6 +724,10 @@ void framebuffer_size_callback(GLFWwindow *window, int width, int height) {
 }
 
 void mouse_callback(GLFWwindow *window, double xpos, double ypos) {
+  // Cursor belongs to the panels in editor mode — don't turn the camera with it.
+  if (uiMode)
+    return;
+
   if (firstMouse) {
     lastX = xpos;
     lastY = ypos;
@@ -657,6 +744,10 @@ void mouse_callback(GLFWwindow *window, double xpos, double ypos) {
 }
 
 void scroll_callback(GLFWwindow *window, double xoffset, double yoffset) {
+  // Let the wheel scroll a panel instead of zooming when it's over one.
+  if (EditorUI::WantsMouse())
+    return;
+
   camera.ProcessMouseScroll(yoffset);
 }
 

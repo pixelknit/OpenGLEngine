@@ -1,4 +1,5 @@
 build/
 .idea/
 .cache/
+imgui.ini
 **.DS_Store

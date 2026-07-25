@@ -31,6 +31,7 @@ public:
                        const std::string &textureFolder, const Transform &transform) {
         models.push_back(std::make_unique<Model>(name, objPath));
         Entity entity;
+        entity.name = name;
         entity.model = models.back().get();
         entity.material = Material::LoadPBR(textureFolder);
         entity.transform = transform;
@@ -56,6 +57,7 @@ public:
                           const std::vector<float> &lodDistances, const std::string &textureFolder,
                           const Transform &transform) {
         Entity entity;
+        entity.name = name;
         for (size_t i = 0; i < objPaths.size(); ++i) {
             models.push_back(std::make_unique<Model>(name + "_LOD" + std::to_string(i), objPaths[i]));
             entity.lodModels.push_back(models.back().get());
@@ -90,6 +92,7 @@ public:
                                    unsigned int count, const glm::vec3 &center, float radius,
                                    const glm::vec2 &scaleRange, unsigned int seed = 1337) {
         Entity entity;
+        entity.name = name;
         for (size_t i = 0; i < objPaths.size(); ++i) {
             models.push_back(std::make_unique<Model>(name + "_LOD" + std::to_string(i), objPaths[i]));
             entity.lodModels.push_back(models.back().get());
@@ -97,35 +100,54 @@ public:
         entity.lodDistances = lodDistances;
         entity.model = entity.lodModels.front();
         entity.material = Material::LoadPBR(textureFolder);
+
+        entity.scatter.enabled = true;
+        entity.scatter.count = count;
+        entity.scatter.center = center;
+        entity.scatter.radius = radius;
+        entity.scatter.scaleRange = scaleRange;
+        entity.scatter.seed = seed;
+        Rescatter(entity);
+
+        entities.push_back(entity);
+        return entities.back();
+    }
+
+    // Rebuilds a scattered entity's instance transforms from its current
+    // entity.scatter values and re-uploads them to every LOD mesh. Call after
+    // editing any scatter parameter (the editor UI does this on each change);
+    // it costs one buffer upload per submesh per LOD, no mesh reloading.
+    void Rescatter(Entity &entity) {
+        const ScatterParams &p = entity.scatter;
+        if (!p.enabled) return;
+
         // UpdateLOD() picks the cluster's detail level off transform.position,
         // so anchor it at the scatter center.
-        entity.transform.position = center;
+        entity.transform.position = p.center;
 
-        std::mt19937 rng(seed);
+        std::mt19937 rng(p.seed);
         std::uniform_real_distribution<float> unit(0.0f, 1.0f);
         std::uniform_real_distribution<float> angleDist(0.0f, glm::two_pi<float>());
-        std::uniform_real_distribution<float> scaleDist(scaleRange.x, scaleRange.y);
+        std::uniform_real_distribution<float> scaleDist(p.scaleRange.x, p.scaleRange.y);
 
-        entity.instanceTransforms.reserve(count);
-        for (unsigned int i = 0; i < count; ++i) {
+        entity.instanceTransforms.clear();
+        entity.instanceTransforms.reserve(p.count);
+        for (unsigned int i = 0; i < p.count; ++i) {
             // sqrt(unit) keeps points uniformly dense across the disc instead
             // of clustering near the center.
-            float r = radius * std::sqrt(unit(rng));
+            float r = p.radius * std::sqrt(unit(rng));
             float angle = angleDist(rng);
-            glm::vec3 position = center + glm::vec3(r * std::cos(angle), 0.0f, r * std::sin(angle));
+            glm::vec3 position = p.center + glm::vec3(r * std::cos(angle), 0.0f, r * std::sin(angle));
 
             Transform t;
             t.position = position;
-            t.rotation = glm::vec3(0.0f, glm::degrees(angleDist(rng)), 0.0f);
+            t.rotation = glm::vec3(0.0f, unit(rng) * p.yRotationJitter, 0.0f);
             t.scale = glm::vec3(scaleDist(rng));
             entity.instanceTransforms.push_back(t.GetMatrix());
         }
 
         for (Model *lodModel : entity.lodModels)
             lodModel->SetupInstancing(entity.instanceTransforms);
-
-        entities.push_back(entity);
-        return entities.back();
     }
 
     // Call once per frame (before the render passes) to pick each LOD
